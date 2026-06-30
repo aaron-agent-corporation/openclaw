@@ -63,7 +63,7 @@ function runContext(messages: AgentMessage[], cfg: OpenClawConfig = enabledCfg):
     sessionKey: SESSION_KEY,
   } as Parameters<typeof buildEmbeddedExtensionFactories>[0]);
   for (const factory of factories) {
-    factory(api);
+    void factory(api);
   }
   let current = messages;
   for (const handler of handlers) {

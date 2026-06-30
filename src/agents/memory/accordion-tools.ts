@@ -50,7 +50,8 @@ function makeAccordionTool(
     description: spec.description,
     parameters: TopicSchema,
     execute: async (_toolCallId, args) => {
-      const topic = String(asToolParamsRecord(args).topic ?? "");
+      const rawTopic = asToolParamsRecord(args).topic;
+      const topic = typeof rawTopic === "string" ? rawTopic : "";
       const boxId = resolveBoxId(scope, topic);
       if (boxId == null) {
         return jsonResult({ ok: false, error: `No topic box matched "${topic}".` });

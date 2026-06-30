@@ -39,7 +39,7 @@ function collectAgentEndHandlers(factories: ReturnType<typeof buildEmbeddedExten
     },
   } as unknown as ExtensionAPI;
   for (const factory of factories) {
-    factory(api);
+    void factory(api);
   }
   return handlers;
 }
@@ -87,7 +87,7 @@ describe("conversational-memory capture wiring (02-01 live-equivalent)", () => {
     );
     expect(handlers).toHaveLength(1);
 
-    await handlers[0]!({ type: "agent_end", messages: sampleTurn });
+    await handlers[0]({ type: "agent_end", messages: sampleTurn });
 
     const stored = getTurns({ agentId: "main", sessionKey: SESSION_KEY });
     expect(stored.map((t) => t.content)).toEqual(["set up voice", "Done."]);

@@ -71,7 +71,7 @@ export function appendTurns(options: SessionScopedOptions & { turns: readonly Ne
         .select((eb) => eb.fn.max("seq").as("max_seq"))
         .where("session_key", "=", options.sessionKey),
     );
-    let seq = maxRow?.max_seq == null ? 0 : Number(maxRow.max_seq);
+    let seq = maxRow?.max_seq == null ? 0 : maxRow.max_seq;
     let inserted = 0;
     for (const turn of options.turns) {
       if (existing.has(turn.idempotencyKey)) {
@@ -276,7 +276,7 @@ export function setBoxStateManual(
           .select((eb) => eb.fn.max("seq").as("max_seq"))
           .where("session_key", "=", options.sessionKey),
       );
-      const headSeq = head?.max_seq == null ? null : Number(head.max_seq);
+      const headSeq = head?.max_seq == null ? null : head.max_seq;
       executeSqliteQuerySync(
         database.db,
         db

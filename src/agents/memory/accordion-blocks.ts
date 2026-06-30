@@ -41,7 +41,9 @@ export function blockId(message: AgentMessage, index: number, partIndex?: number
     case "user":
       return m.timestamp != null ? `u:${m.timestamp}` : `m${index}:u`;
     case "assistant": {
-      if (partIndex == null) return `m${index}:p?`;
+      if (partIndex == null) {
+        return `m${index}:p?`;
+      }
       const anchor =
         m.responseId != null ? m.responseId : m.timestamp != null ? `t${m.timestamp}` : null;
       return anchor != null ? `a:${anchor}:p${partIndex}` : `m${index}:p${partIndex}`;

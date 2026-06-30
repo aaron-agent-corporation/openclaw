@@ -20,12 +20,12 @@ function tempScope() {
   return scope(fs.mkdtempSync(path.join(os.tmpdir(), "openclaw-tag-graph-")));
 }
 
-function addTag(scope: ReturnType<typeof tempScope>, tagId: string, label: string): void {
-  upsertMemoryTag({ ...scope, tag: { tagId, label } });
+function addTag(sc: ReturnType<typeof tempScope>, tagId: string, label: string): void {
+  upsertMemoryTag({ ...sc, tag: { tagId, label } });
 }
 
 function tagTarget(
-  scope: ReturnType<typeof tempScope>,
+  sc: ReturnType<typeof tempScope>,
   tagId: string,
   target:
     | { boxId: string; type: "box" }
@@ -33,10 +33,10 @@ function tagTarget(
     | { seq: number; type: "turn" },
 ): void {
   associateMemoryTag({
-    ...scope,
+    ...sc,
     source: "agent",
     tagId,
-    target: { ...target, sessionKey: scope.sessionKey },
+    target: { ...target, sessionKey: sc.sessionKey },
   });
 }
 

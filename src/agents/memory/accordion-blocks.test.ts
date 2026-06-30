@@ -38,10 +38,10 @@ function sample(): AgentMessage[] {
 describe("accordion-blocks (02-02 spike)", () => {
   it("derives durable content-anchored ids from OpenClaw message anchors", () => {
     const msgs = sample();
-    expect(blockId(msgs[0]!, 0)).toBe("u:1");
-    expect(blockId(msgs[1]!, 1, 0)).toBe("a:resp-1:p0"); // thinking part
-    expect(blockId(msgs[1]!, 1, 2)).toBe("a:resp-1:p2"); // tool_call part
-    expect(blockId(msgs[2]!, 2)).toBe("r:call-1");
+    expect(blockId(msgs[0], 0)).toBe("u:1");
+    expect(blockId(msgs[1], 1, 0)).toBe("a:resp-1:p0"); // thinking part
+    expect(blockId(msgs[1], 1, 2)).toBe("a:resp-1:p2"); // tool_call part
+    expect(blockId(msgs[2], 2)).toBe("r:call-1");
     expect(["u:1", "a:resp-1:p0", "r:call-1"].every(isDurableId)).toBe(true);
   });
 

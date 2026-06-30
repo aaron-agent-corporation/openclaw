@@ -16,7 +16,7 @@ type Captured = { success: boolean; result: unknown; error: unknown };
 
 function invoke(params: Record<string, unknown>): Captured {
   let captured: Captured | undefined;
-  accordionHandlers["accordion.toggle"]({
+  void accordionHandlers["accordion.toggle"]({
     params,
     respond: (success: boolean, result: unknown, error: unknown) => {
       captured = { success, result, error };
