@@ -1376,6 +1376,14 @@ export const fa: TranslationMap = {
       retrySend: "تلاش دوباره برای ارسال",
       retryQueuedMessage: "تلاش دوباره برای پیام در صف",
     },
+    topics: {
+      label: "موضوعات",
+      untitled: "موضوع بدون عنوان",
+      expand: "گسترش",
+      collapse: "جمع کردن",
+      expandTopic: "گسترش موضوع {topic}",
+      collapseTopic: "جمع کردن موضوع {topic}",
+    },
     composer: {
       placeholder: "Message {name} (Enter to send)",
       placeholderWithAttachments: "Add a message or paste more images...",

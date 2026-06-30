@@ -1378,6 +1378,14 @@ export const uk: TranslationMap = {
       retrySend: "Повторити надсилання",
       retryQueuedMessage: "Повторити повідомлення в черзі",
     },
+    topics: {
+      label: "Теми",
+      untitled: "Тема без назви",
+      expand: "Розгорнути",
+      collapse: "Згорнути",
+      expandTopic: "Розгорнути тему {topic}",
+      collapseTopic: "Згорнути тему {topic}",
+    },
     composer: {
       placeholder: "Message {name} (Enter to send)",
       placeholderWithAttachments: "Add a message or paste more images...",

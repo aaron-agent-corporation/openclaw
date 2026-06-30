@@ -1365,6 +1365,14 @@ export const ko: TranslationMap = {
       retrySend: "보내기 다시 시도",
       retryQueuedMessage: "대기 중인 메시지 다시 시도",
     },
+    topics: {
+      label: "주제",
+      untitled: "제목 없는 주제",
+      expand: "펼치기",
+      collapse: "접기",
+      expandTopic: "{topic} 주제 펼치기",
+      collapseTopic: "{topic} 주제 접기",
+    },
     composer: {
       placeholder: "Message {name} (Enter to send)",
       placeholderWithAttachments: "Add a message or paste more images...",
