@@ -22,4 +22,17 @@ export function registerMemoryCommand(program: Command): void {
         );
       });
     });
+
+  memory
+    .command("tune")
+    .description("Rank auto-collapse rule candidates against an agent's backfilled history")
+    .option("--agent <id>", "Agent id whose backfilled history to replay")
+    .option("--json", "Output JSON", false)
+    .action(async (opts: { agent?: string; json?: boolean }) => {
+      await runCommandWithRuntime(defaultRuntime, async () => {
+        // Lazy-import the command body so the CLI startup path stays small.
+        const { runMemoryTuneCommand } = await import("../../commands/memory-tune.js");
+        await runMemoryTuneCommand({ agent: opts.agent, json: Boolean(opts.json) }, defaultRuntime);
+      });
+    });
 }
