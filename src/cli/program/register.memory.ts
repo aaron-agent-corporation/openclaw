@@ -5,7 +5,14 @@ import { runCommandWithRuntime } from "../cli-utils.js";
 
 /** Register the `memory` command group + its `backfill` subcommand. */
 export function registerMemoryCommand(program: Command): void {
-  const memory = program.command("memory").description("Maintain per-agent conversational memory");
+  const memory =
+    program.commands.find(
+      (command) => command.name() === "memory" || command.aliases().includes("memory"),
+    ) ?? program.command("memory").description("Maintain per-agent conversational memory");
+
+  if (memory.commands.some((command) => command.name() === "backfill")) {
+    return;
+  }
 
   memory
     .command("backfill")

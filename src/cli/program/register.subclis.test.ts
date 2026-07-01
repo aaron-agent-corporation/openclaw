@@ -29,6 +29,13 @@ const { registerQaLabCli } = vi.hoisted(() => ({
 const { loadPrivateQaCliModule } = vi.hoisted(() => ({
   loadPrivateQaCliModule: vi.fn(async () => ({ registerQaLabCli })),
 }));
+const { registerMemoryCommand } = vi.hoisted(() => ({
+  registerMemoryCommand: vi.fn((program: Command) => {
+    const memory =
+      program.commands.find((command) => command.name() === "memory") ?? program.command("memory");
+    memory.command("backfill").action(() => undefined);
+  }),
+}));
 
 const { inferAction, registerCapabilityCli } = vi.hoisted(() => {
   const action = vi.fn();
@@ -46,7 +53,9 @@ const { registerPluginsCli, registerPluginCliCommandsFromValidatedConfig } = vi.
       .argument("[id]")
       .action(() => undefined);
   }),
-  registerPluginCliCommandsFromValidatedConfig: vi.fn(async () => null),
+  registerPluginCliCommandsFromValidatedConfig: vi.fn<
+    (_program: Command) => Promise<Record<string, unknown> | null>
+  >(async () => null),
 }));
 const { registerChannelsCli } = vi.hoisted(() => ({
   registerChannelsCli: vi.fn(async () => undefined),
@@ -75,6 +84,7 @@ vi.mock("../capability-cli.js", () => ({ registerCapabilityCli }));
 vi.mock("../plugins-cli.js", () => ({ registerPluginsCli }));
 vi.mock("../channels-cli.js", () => ({ registerChannelsCli }));
 vi.mock("../../plugins/cli.js", () => ({ registerPluginCliCommandsFromValidatedConfig }));
+vi.mock("./register.memory.js", () => ({ registerMemoryCommand }));
 vi.mock("./private-qa-cli.js", async () => {
   const actual = await vi.importActual<typeof import("./private-qa-cli.js")>("./private-qa-cli.js");
   return {
@@ -111,6 +121,7 @@ describe("registerSubCliCommands", () => {
     nodesAction.mockClear();
     registerQaLabCli.mockClear();
     loadPrivateQaCliModule.mockClear();
+    registerMemoryCommand.mockClear();
     registerCapabilityCli.mockClear();
     inferAction.mockClear();
     registerPluginsCli.mockClear();
@@ -153,6 +164,7 @@ describe("registerSubCliCommands", () => {
     expect(names).toContain("acp");
     expect(names).toContain("gateway");
     expect(names).toContain("clawbot");
+    expect(names).toContain("memory");
     expect(names).toContain("qa");
     expect(registerAcpCli).not.toHaveBeenCalled();
   });
@@ -180,6 +192,27 @@ describe("registerSubCliCommands", () => {
       "list",
     ]);
     expect(nodesAction).toHaveBeenCalledTimes(1);
+  });
+
+  it("registers memory plugin commands before adding core backfill", async () => {
+    registerPluginCliCommandsFromValidatedConfig.mockImplementationOnce(
+      async (program: Command) => {
+        const memory = program.command("memory").description("Memory commands");
+        memory.command("index").action(() => undefined);
+        return {};
+      },
+    );
+    const program = createRegisteredProgram(["node", "openclaw", "memory", "index"], "openclaw");
+
+    await program.parseAsync(["memory", "index"], { from: "user" });
+
+    const memory = program.commands.find((command) => command.name() === "memory");
+    expect(memory?.commands.map((command) => command.name()).toSorted()).toEqual([
+      "backfill",
+      "index",
+    ]);
+    expect(registerPluginCliCommandsFromValidatedConfig).toHaveBeenCalledTimes(1);
+    expect(registerMemoryCommand).toHaveBeenCalledTimes(1);
   });
 
   it("registers the infer placeholder and dispatches through the capability registrar", async () => {
