@@ -1374,6 +1374,14 @@ export const id: TranslationMap = {
       retrySend: "Coba kirim lagi",
       retryQueuedMessage: "Coba lagi pesan dalam antrean",
     },
+    topics: {
+      label: "Topik",
+      untitled: "Topik tanpa judul",
+      expand: "Perluas",
+      collapse: "Ciutkan",
+      expandTopic: "Perluas topik {topic}",
+      collapseTopic: "Ciutkan topik {topic}",
+    },
     composer: {
       placeholder: "Message {name} (Enter to send)",
       placeholderWithAttachments: "Add a message or paste more images...",

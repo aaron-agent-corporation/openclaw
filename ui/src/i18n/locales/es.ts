@@ -1382,6 +1382,14 @@ export const es: TranslationMap = {
       retrySend: "Reintentar envío",
       retryQueuedMessage: "Reintentar mensaje en cola",
     },
+    topics: {
+      label: "Temas",
+      untitled: "Tema sin título",
+      expand: "Expandir",
+      collapse: "Contraer",
+      expandTopic: "Expandir tema {topic}",
+      collapseTopic: "Contraer tema {topic}",
+    },
     composer: {
       placeholder: "Message {name} (Enter to send)",
       placeholderWithAttachments: "Add a message or paste more images...",

@@ -1358,6 +1358,14 @@ export const ar: TranslationMap = {
       retrySend: "إعادة محاولة الإرسال",
       retryQueuedMessage: "إعادة محاولة الرسالة في قائمة الانتظار",
     },
+    topics: {
+      label: "المواضيع",
+      untitled: "موضوع بلا عنوان",
+      expand: "توسيع",
+      collapse: "طي",
+      expandTopic: "توسيع الموضوع {topic}",
+      collapseTopic: "طي الموضوع {topic}",
+    },
     composer: {
       placeholder: "Message {name} (Enter to send)",
       placeholderWithAttachments: "Add a message or paste more images...",

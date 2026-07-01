@@ -1384,6 +1384,14 @@ export const ru: TranslationMap = {
       retrySend: "Повторить отправку",
       retryQueuedMessage: "Повторить сообщение в очереди",
     },
+    topics: {
+      label: "Темы",
+      untitled: "Безымянная тема",
+      expand: "Развернуть",
+      collapse: "Свернуть",
+      expandTopic: "Развернуть тему {topic}",
+      collapseTopic: "Свернуть тему {topic}",
+    },
     composer: {
       placeholder: "Сообщение {name} (Enter для отправки)",
       placeholderWithAttachments: "Добавьте сообщение или вставьте еще изображения...",

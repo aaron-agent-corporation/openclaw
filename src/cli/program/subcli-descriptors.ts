@@ -128,6 +128,11 @@ const subCliCommandCatalog = defineCommandDescriptorCatalog([
     hasSubcommands: false,
   },
   {
+    name: "memory",
+    description: "Search, inspect, reindex, and backfill memory",
+    hasSubcommands: true,
+  },
+  {
     name: "clawbot",
     description: "Legacy clawbot command aliases",
     hasSubcommands: true,

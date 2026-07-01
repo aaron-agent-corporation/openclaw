@@ -1389,6 +1389,14 @@ export const fr: TranslationMap = {
       retrySend: "Réessayer l’envoi",
       retryQueuedMessage: "Réessayer le message en file d’attente",
     },
+    topics: {
+      label: "Sujets",
+      untitled: "Sujet sans titre",
+      expand: "Développer",
+      collapse: "Réduire",
+      expandTopic: "Développer le sujet {topic}",
+      collapseTopic: "Réduire le sujet {topic}",
+    },
     composer: {
       placeholder: "Message {name} (Enter to send)",
       placeholderWithAttachments: "Add a message or paste more images...",

@@ -1380,6 +1380,14 @@ export const tr: TranslationMap = {
       retrySend: "Göndermeyi yeniden dene",
       retryQueuedMessage: "Kuyruğa alınan iletiyi yeniden dene",
     },
+    topics: {
+      label: "Konular",
+      untitled: "Başlıksız konu",
+      expand: "Genişlet",
+      collapse: "Daralt",
+      expandTopic: "{topic} konusunu genişlet",
+      collapseTopic: "{topic} konusunu daralt",
+    },
     composer: {
       placeholder: "Message {name} (Enter to send)",
       placeholderWithAttachments: "Add a message or paste more images...",

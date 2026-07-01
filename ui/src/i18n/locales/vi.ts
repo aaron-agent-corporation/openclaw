@@ -1366,6 +1366,14 @@ export const vi: TranslationMap = {
       retrySend: "Thử gửi lại",
       retryQueuedMessage: "Thử lại tin nhắn trong hàng đợi",
     },
+    topics: {
+      label: "Chủ đề",
+      untitled: "Chủ đề chưa đặt tên",
+      expand: "Mở rộng",
+      collapse: "Thu gọn",
+      expandTopic: "Mở rộng chủ đề {topic}",
+      collapseTopic: "Thu gọn chủ đề {topic}",
+    },
     composer: {
       placeholder: "Message {name} (Enter to send)",
       placeholderWithAttachments: "Add a message or paste more images...",

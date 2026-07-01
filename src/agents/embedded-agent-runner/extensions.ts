@@ -19,6 +19,8 @@ import {
 import { resolveContextWindowInfo } from "../context-window-guard.js";
 import { DEFAULT_CONTEXT_TOKENS } from "../defaults.js";
 import { createAgentToolResultMiddlewareRunner } from "../harness/tool-result-middleware.js";
+import { conversationalMemoryAccordionExtension } from "../memory/accordion-extension.js";
+import { conversationalMemoryCaptureExtension } from "../memory/turns-capture.js";
 import type { AgentToolResult } from "../runtime/index.js";
 import type { ExtensionFactory, SessionManager } from "../sessions/index.js";
 import { isToolResultError } from "../tool-result-error.js";
@@ -171,6 +173,21 @@ function buildContextPruningFactory(params: {
   return contextPruningExtension;
 }
 
+function conversationalMemoryScope(params: {
+  cfg: OpenClawConfig | undefined;
+  agentId?: string;
+  sessionKey?: string;
+}): { agentId: string; sessionKey: string } | undefined {
+  // Off by default; capture + accordion need a durable agent + session scope.
+  if (params.cfg?.agents?.defaults?.conversationalMemory?.enabled !== true) {
+    return undefined;
+  }
+  if (!params.agentId || !params.sessionKey) {
+    return undefined;
+  }
+  return { agentId: params.agentId, sessionKey: params.sessionKey };
+}
+
 export function buildEmbeddedExtensionFactories(params: {
   cfg: OpenClawConfig | undefined;
   sessionManager: SessionManager;
@@ -179,8 +196,17 @@ export function buildEmbeddedExtensionFactories(params: {
   modelId: string;
   model: ProviderRuntimeModel | undefined;
   runId?: string;
+  agentId?: string;
+  sessionKey?: string;
 }): ExtensionFactory[] {
   const factories: ExtensionFactory[] = [];
+  const memoryScope = conversationalMemoryScope(params);
+  if (memoryScope) {
+    factories.push(conversationalMemoryCaptureExtension(memoryScope));
+    // Accordion runs before the cache-ttl trimmer below so the trimmer sees the
+    // already-collapsed context (semantic topic fold first, token trim second).
+    factories.push(conversationalMemoryAccordionExtension(memoryScope));
+  }
   if (resolveEffectiveCompactionMode(params.cfg) === "safeguard") {
     const compactionCfg = params.cfg?.agents?.defaults?.compaction;
     const qualityGuardCfg = compactionCfg?.qualityGuard;

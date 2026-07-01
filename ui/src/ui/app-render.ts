@@ -57,7 +57,7 @@ import {
 } from "./controllers/agents.ts";
 import { setAssistantAvatarOverride } from "./controllers/assistant-identity.ts";
 import { loadChannels } from "./controllers/channels.ts";
-import { loadChatHistory } from "./controllers/chat.ts";
+import { loadChatHistory, toggleAccordionBox } from "./controllers/chat.ts";
 import {
   applyConfig,
   ensureAgentConfigEntry,
@@ -549,6 +549,11 @@ function resolveSidebarRecentSessions(state: AppViewState): GatewaySessionRow[] 
 }
 
 function renderSidebarSessions(state: AppViewState) {
+  // Unified-session mode joins one main session per agent; per-conversation
+  // switching, new-session, and the recent-sessions list are hidden.
+  if (state.unifiedSession) {
+    return nothing;
+  }
   const collapsed = state.settings.navCollapsed;
   const busy = isSidebarSessionBusy(state);
   const recent = collapsed ? [] : resolveSidebarRecentSessions(state);
@@ -3769,6 +3774,11 @@ export function renderApp(state: AppViewState) {
                   fallbackStatus: state.fallbackStatus,
                   assistantAvatarUrl: chatAvatarUrl,
                   messages: state.chatMessages,
+                  accordion: state.chatAccordion,
+                  unifiedSession: state.unifiedSession,
+                  onToggleTopic: (boxId, nextState) => {
+                    void toggleAccordionBox(state, boxId, nextState);
+                  },
                   sideResult: state.chatSideResult,
                   toolMessages: state.chatToolMessages,
                   streamSegments: state.chatStreamSegments,

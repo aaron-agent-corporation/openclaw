@@ -1379,6 +1379,14 @@ export const ja_JP: TranslationMap = {
       retrySend: "送信を再試行",
       retryQueuedMessage: "キュー内のメッセージを再試行",
     },
+    topics: {
+      label: "トピック",
+      untitled: "無題のトピック",
+      expand: "展開",
+      collapse: "折りたたむ",
+      expandTopic: "トピック {topic} を展開",
+      collapseTopic: "トピック {topic} を折りたたむ",
+    },
     composer: {
       placeholder: "Message {name} (Enter to send)",
       placeholderWithAttachments: "Add a message or paste more images...",

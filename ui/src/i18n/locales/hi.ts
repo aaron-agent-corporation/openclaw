@@ -1360,6 +1360,14 @@ export const hi: TranslationMap = {
       retrySend: "भेजने का पुनः प्रयास करें",
       retryQueuedMessage: "कतारबद्ध संदेश का पुनः प्रयास करें",
     },
+    topics: {
+      label: "विषय",
+      untitled: "बिना शीर्षक वाला विषय",
+      expand: "विस्तार करें",
+      collapse: "संक्षिप्त करें",
+      expandTopic: "विषय {topic} को विस्तार करें",
+      collapseTopic: "विषय {topic} को संक्षिप्त करें",
+    },
     composer: {
       placeholder: "{name} को संदेश भेजें (भेजने के लिए Enter)",
       placeholderWithAttachments: "संदेश जोड़ें या और छवियाँ पेस्ट करें...",

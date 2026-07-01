@@ -1379,6 +1379,14 @@ export const pl: TranslationMap = {
       retrySend: "Ponów wysłanie",
       retryQueuedMessage: "Ponów wiadomość w kolejce",
     },
+    topics: {
+      label: "Tematy",
+      untitled: "Temat bez tytułu",
+      expand: "Rozwiń",
+      collapse: "Zwiń",
+      expandTopic: "Rozwiń temat {topic}",
+      collapseTopic: "Zwiń temat {topic}",
+    },
     composer: {
       placeholder: "Message {name} (Enter to send)",
       placeholderWithAttachments: "Add a message or paste more images...",

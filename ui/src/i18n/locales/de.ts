@@ -1385,6 +1385,14 @@ export const de: TranslationMap = {
       retrySend: "Senden wiederholen",
       retryQueuedMessage: "Nachricht in der Warteschlange erneut senden",
     },
+    topics: {
+      label: "Themen",
+      untitled: "Unbenanntes Thema",
+      expand: "Erweitern",
+      collapse: "Reduzieren",
+      expandTopic: "Thema {topic} erweitern",
+      collapseTopic: "Thema {topic} reduzieren",
+    },
     composer: {
       placeholder: "Message {name} (Enter to send)",
       placeholderWithAttachments: "Add a message or paste more images...",

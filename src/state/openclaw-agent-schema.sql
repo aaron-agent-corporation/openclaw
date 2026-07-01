@@ -132,3 +132,127 @@ CREATE INDEX IF NOT EXISTS idx_memory_index_chunks_path
 
 CREATE INDEX IF NOT EXISTS idx_memory_index_chunks_source
   ON memory_index_chunks(source);
+
+-- Conversational-memory durable store (Phase 2). Immutable append-only turns
+-- plus thin span/box metadata. The accordion flips boxes.state only; turns is
+-- never mutated. seq is assigned monotonically per session_key at append time.
+CREATE TABLE IF NOT EXISTS turns (
+  session_key TEXT NOT NULL,
+  seq INTEGER NOT NULL,
+  role TEXT NOT NULL,
+  content TEXT NOT NULL,
+  content_hash TEXT NOT NULL,
+  idempotency_key TEXT NOT NULL,
+  run_id TEXT,
+  channel TEXT,
+  ts INTEGER NOT NULL,
+  noise_class TEXT,
+  PRIMARY KEY (session_key, seq)
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_turns_idempotency
+  ON turns(idempotency_key);
+
+-- Contiguous range of turns sharing a topic; belongs to at most one box.
+CREATE TABLE IF NOT EXISTS spans (
+  span_id TEXT NOT NULL PRIMARY KEY,
+  session_key TEXT NOT NULL,
+  start_seq INTEGER NOT NULL,
+  end_seq INTEGER NOT NULL,
+  topic TEXT,
+  box_id TEXT,
+  noise_class TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_spans_session_start
+  ON spans(session_key, start_seq);
+
+CREATE INDEX IF NOT EXISTS idx_spans_box
+  ON spans(box_id)
+  WHERE box_id IS NOT NULL;
+
+-- A topic that owns one or more (possibly non-contiguous) spans. Collapse/expand
+-- flips state; summary/importance/suppression_rollup are dreaming-maintained (Phase 3).
+CREATE TABLE IF NOT EXISTS boxes (
+  box_id TEXT NOT NULL PRIMARY KEY,
+  session_key TEXT NOT NULL,
+  label TEXT,
+  state TEXT NOT NULL DEFAULT 'live',
+  summary TEXT,
+  summary_embedding_ref TEXT,
+  importance REAL,
+  suppression_rollup TEXT,
+  last_active_seq INTEGER
+);
+
+CREATE INDEX IF NOT EXISTS idx_boxes_session
+  ON boxes(session_key);
+
+-- Phase 3 associative layer foundation. These tables keep local tag/entity
+-- vocabulary and lightweight associations to durable turns, spans, and boxes.
+CREATE TABLE IF NOT EXISTS memory_tags (
+  tag_id TEXT NOT NULL PRIMARY KEY,
+  label TEXT NOT NULL,
+  normalized_label TEXT NOT NULL,
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_memory_tags_normalized_label
+  ON memory_tags(normalized_label);
+
+-- Multi-parent tag DAG edge. Cycle prevention lives in the store API.
+CREATE TABLE IF NOT EXISTS memory_tag_edges (
+  child_tag_id TEXT NOT NULL,
+  parent_tag_id TEXT NOT NULL,
+  relation TEXT NOT NULL DEFAULT 'is_a',
+  created_at INTEGER NOT NULL,
+  PRIMARY KEY (child_tag_id, parent_tag_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_memory_tag_edges_parent
+  ON memory_tag_edges(parent_tag_id);
+
+CREATE TABLE IF NOT EXISTS memory_entities (
+  entity_id TEXT NOT NULL PRIMARY KEY,
+  entity_type TEXT NOT NULL,
+  label TEXT NOT NULL,
+  normalized_label TEXT NOT NULL,
+  local_only INTEGER NOT NULL DEFAULT 1,
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_memory_entities_type_label
+  ON memory_entities(entity_type, normalized_label);
+
+CREATE TABLE IF NOT EXISTS memory_associations (
+  association_id TEXT NOT NULL PRIMARY KEY,
+  session_key TEXT NOT NULL,
+  target_type TEXT NOT NULL,
+  target_id TEXT NOT NULL,
+  tag_id TEXT,
+  entity_id TEXT,
+  salience REAL,
+  source TEXT NOT NULL,
+  created_at INTEGER NOT NULL
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_memory_associations_unique_tag
+  ON memory_associations(session_key, target_type, target_id, tag_id)
+  WHERE tag_id IS NOT NULL;
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_memory_associations_unique_entity
+  ON memory_associations(session_key, target_type, target_id, entity_id)
+  WHERE entity_id IS NOT NULL;
+
+CREATE INDEX IF NOT EXISTS idx_memory_associations_target
+  ON memory_associations(session_key, target_type, target_id);
+
+CREATE INDEX IF NOT EXISTS idx_memory_associations_tag
+  ON memory_associations(tag_id)
+  WHERE tag_id IS NOT NULL;
+
+CREATE INDEX IF NOT EXISTS idx_memory_associations_entity
+  ON memory_associations(entity_id)
+  WHERE entity_id IS NOT NULL;

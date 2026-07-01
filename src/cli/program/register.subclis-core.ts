@@ -205,6 +205,17 @@ const entrySpecs: readonly CommandGroupDescriptorSpec<SubCliRegistrar>[] = [
       loadModule: () => import("../qr-cli.js"),
       exportName: "registerQrCli",
     },
+  ]),
+  {
+    commandNames: ["memory"],
+    register: async (program) => {
+      const { registerPluginCliCommandsFromValidatedConfig } = await pluginCliLoader.load();
+      await registerPluginCliCommandsFromValidatedConfig(program);
+      const mod = await import("./register.memory.js");
+      mod.registerMemoryCommand(program);
+    },
+  },
+  ...defineImportedProgramCommandGroupSpecs([
     {
       commandNames: ["clawbot"],
       loadModule: () => import("../clawbot-cli.js"),

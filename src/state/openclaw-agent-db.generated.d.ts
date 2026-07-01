@@ -22,6 +22,18 @@ export interface AuthProfileStore {
   updated_at: number;
 }
 
+export interface Boxes {
+  box_id: string;
+  importance: number | null;
+  label: string | null;
+  last_active_seq: number | null;
+  session_key: string;
+  state: Generated<string>;
+  summary: string | null;
+  summary_embedding_ref: string | null;
+  suppression_rollup: string | null;
+}
+
 export interface CacheEntries {
   blob: Uint8Array | null;
   expires_at: number | null;
@@ -31,6 +43,18 @@ export interface CacheEntries {
   value_json: string | null;
 }
 
+export interface MemoryAssociations {
+  association_id: string;
+  created_at: number;
+  entity_id: string | null;
+  salience: number | null;
+  session_key: string;
+  source: string;
+  tag_id: string | null;
+  target_id: string;
+  target_type: string;
+}
+
 export interface MemoryEmbeddingCache {
   dims: number | null;
   embedding: string;
@@ -38,6 +62,16 @@ export interface MemoryEmbeddingCache {
   model: string;
   provider: string;
   provider_key: string;
+  updated_at: number;
+}
+
+export interface MemoryEntities {
+  created_at: number;
+  entity_id: string;
+  entity_type: string;
+  label: string;
+  local_only: Generated<number>;
+  normalized_label: string;
   updated_at: number;
 }
 
@@ -72,6 +106,21 @@ export interface MemoryIndexState {
   revision: number;
 }
 
+export interface MemoryTagEdges {
+  child_tag_id: string;
+  created_at: number;
+  parent_tag_id: string;
+  relation: Generated<string>;
+}
+
+export interface MemoryTags {
+  created_at: number;
+  label: string;
+  normalized_label: string;
+  tag_id: string;
+  updated_at: number;
+}
+
 export interface SchemaMeta {
   agent_id: string | null;
   app_version: string | null;
@@ -82,14 +131,44 @@ export interface SchemaMeta {
   updated_at: number;
 }
 
+export interface Spans {
+  box_id: string | null;
+  end_seq: number;
+  noise_class: string | null;
+  session_key: string;
+  span_id: string;
+  start_seq: number;
+  topic: string | null;
+}
+
+export interface Turns {
+  channel: string | null;
+  content: string;
+  content_hash: string;
+  idempotency_key: string;
+  noise_class: string | null;
+  role: string;
+  run_id: string | null;
+  seq: number;
+  session_key: string;
+  ts: number;
+}
+
 export interface DB {
   auth_profile_state: AuthProfileState;
   auth_profile_store: AuthProfileStore;
+  boxes: Boxes;
   cache_entries: CacheEntries;
+  memory_associations: MemoryAssociations;
   memory_embedding_cache: MemoryEmbeddingCache;
+  memory_entities: MemoryEntities;
   memory_index_chunks: MemoryIndexChunks;
   memory_index_meta: MemoryIndexMeta;
   memory_index_sources: MemoryIndexSources;
   memory_index_state: MemoryIndexState;
+  memory_tag_edges: MemoryTagEdges;
+  memory_tags: MemoryTags;
   schema_meta: SchemaMeta;
+  spans: Spans;
+  turns: Turns;
 }

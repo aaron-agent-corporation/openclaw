@@ -1342,6 +1342,14 @@ export const th: TranslationMap = {
       retrySend: "ลองส่งอีกครั้ง",
       retryQueuedMessage: "ลองส่งข้อความในคิวอีกครั้ง",
     },
+    topics: {
+      label: "หัวข้อ",
+      untitled: "หัวข้อไม่มีชื่อ",
+      expand: "ขยาย",
+      collapse: "ยุบ",
+      expandTopic: "ขยายหัวข้อ {topic}",
+      collapseTopic: "ยุบหัวข้อ {topic}",
+    },
     composer: {
       placeholder: "Message {name} (Enter to send)",
       placeholderWithAttachments: "Add a message or paste more images...",

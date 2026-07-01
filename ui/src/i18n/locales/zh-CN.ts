@@ -1337,6 +1337,14 @@ export const zh_CN: TranslationMap = {
       retrySend: "重试发送",
       retryQueuedMessage: "重试排队消息",
     },
+    topics: {
+      label: "主题",
+      untitled: "未命名主题",
+      expand: "展开",
+      collapse: "折叠",
+      expandTopic: "展开主题 {topic}",
+      collapseTopic: "折叠主题 {topic}",
+    },
     composer: {
       placeholder: "给 {name} 发消息（Enter 发送）",
       placeholderWithAttachments: "添加消息或继续粘贴图片...",

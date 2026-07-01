@@ -1380,6 +1380,14 @@ export const nl: TranslationMap = {
       retrySend: "Verzenden opnieuw proberen",
       retryQueuedMessage: "Bericht in wachtrij opnieuw proberen",
     },
+    topics: {
+      label: "Onderwerpen",
+      untitled: "Naamloos onderwerp",
+      expand: "Uitvouwen",
+      collapse: "Samenvouwen",
+      expandTopic: "Onderwerp {topic} uitvouwen",
+      collapseTopic: "Onderwerp {topic} samenvouwen",
+    },
     composer: {
       placeholder: "Message {name} (Enter to send)",
       placeholderWithAttachments: "Add a message or paste more images...",

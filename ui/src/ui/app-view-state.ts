@@ -94,6 +94,9 @@ export type AppViewState = {
   embedSandboxMode: EmbedSandboxMode;
   allowExternalEmbedUrls: boolean;
   chatMessageMaxWidth?: string | null;
+  // Unified-session mode (gateway.controlUi.unifiedSession): the Control UI joins
+  // the agent's single main session and hides per-conversation session switching.
+  unifiedSession?: boolean;
   sessionKey: string;
   chatSessionMessageSubscriptionKey?: string | null;
   chatSessionMessageSubscriptionRequestedKey?: string | null;
@@ -103,6 +106,7 @@ export type AppViewState = {
   chatAttachments: ChatAttachment[];
   chatReplyTarget?: { messageId: string; text: string; senderLabel?: string | null } | null;
   chatMessages: unknown[];
+  chatAccordion: import("./types/chat-types.js").ChatAccordionView | null;
   chatToolMessages: unknown[];
   activityEntries: ActivityEntry[];
   activityFilterText: string;

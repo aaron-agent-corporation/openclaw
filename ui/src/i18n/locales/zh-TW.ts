@@ -1339,6 +1339,14 @@ export const zh_TW: TranslationMap = {
       retrySend: "重新傳送",
       retryQueuedMessage: "重試佇列中的訊息",
     },
+    topics: {
+      label: "主題",
+      untitled: "未命名主題",
+      expand: "展開",
+      collapse: "收合",
+      expandTopic: "展開主題 {topic}",
+      collapseTopic: "收合主題 {topic}",
+    },
     composer: {
       placeholder: "Message {name} (Enter to send)",
       placeholderWithAttachments: "Add a message or paste more images...",

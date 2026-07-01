@@ -24,6 +24,19 @@ export {
   type ResolvedMemorySearchSyncConfig,
 } from "../../../../src/agents/memory-search.js";
 
+// Read-only associative context (topic boxes + linked tags/entities) for search ranking.
+export {
+  readAssociativeContext,
+  type AssociativeBoxContext,
+  type AssociativeContext,
+} from "../../../../src/agents/memory/associative-context.js";
+export {
+  readTagCooccurrence,
+  type TagGraphNeighbor,
+  type TagGraphTargetRef,
+  type TagGraphTraversal,
+} from "../../../../src/agents/memory/tag-graph.js";
+
 // Session and reply helpers.
 export { isHeartbeatUserMessage } from "../../../../src/auto-reply/heartbeat-filter.js";
 export { HEARTBEAT_PROMPT } from "../../../../src/auto-reply/heartbeat.js";

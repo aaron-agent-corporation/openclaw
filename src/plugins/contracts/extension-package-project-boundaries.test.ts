@@ -53,6 +53,7 @@ const MEMORY_HOST_SDK_EXPORTS = [
   "./multimodal",
   "./query",
   "./runtime",
+  "./runtime-associative",
   "./runtime-cli",
   "./runtime-core",
   "./runtime-files",

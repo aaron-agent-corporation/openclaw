@@ -367,6 +367,7 @@ usage endpoint failed or returned no usable usage data.
     | `plugin-sdk/memory-core-host-engine-qmd` | Memory host QMD engine exports |
     | `plugin-sdk/memory-core-host-engine-storage` | Memory host storage engine exports |
     | `plugin-sdk/memory-core-host-multimodal` | Memory host multimodal helpers |
+    | `plugin-sdk/memory-core-host-associative` | Read-only associative memory context (tag/entity co-occurrence) for boosting memory search ranking |
     | `plugin-sdk/memory-core-host-query` | Memory host query helpers |
     | `plugin-sdk/memory-core-host-secret` | Memory host secret helpers |
     | `plugin-sdk/memory-core-host-events` | Deprecated compatibility alias; use `plugin-sdk/memory-host-events` |
