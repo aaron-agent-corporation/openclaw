@@ -30,6 +30,9 @@ import {
   resolveMemoryCitationsMode,
   shouldIncludeCitations,
 } from "./tools.citations.js";
+// Re-export the tag co-occurrence traversal tool so the plugin entry loads it through
+// the same lazy `./src/tools.js` module boundary as memory_search / memory_get.
+export { createTagGraphTool } from "./memory/tag-graph-tool.js";
 import {
   buildMemorySearchUnavailableResult,
   createMemoryTool,

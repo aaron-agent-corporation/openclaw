@@ -85,6 +85,17 @@ const MemoryGetSchema = {
   additionalProperties: false,
 } as const satisfies TSchema;
 
+// Flat args only (platform tool-schema rule): no enums/unions some providers reject.
+const MemoryTagNeighborsSchema = {
+  type: "object",
+  properties: {
+    tag: { type: "string" },
+    limit: { type: "integer", minimum: 1 },
+  },
+  required: ["tag"],
+  additionalProperties: false,
+} as const satisfies TSchema;
+
 function createLazyMemoryTool(params: {
   options: MemoryToolOptions;
   label: string;
@@ -146,6 +157,41 @@ function createLazyMemoryGetTool(options: MemoryToolOptions): AnyAgentTool | nul
   });
 }
 
+// Read-only tag co-occurrence traversal (TAG-01). Gated like the other memory tools —
+// only offered when conversational memory applies for this agent — and the underlying
+// factory additionally no-ops without an agent session key.
+function createLazyTagGraphTool(options: MemoryToolOptions): AnyAgentTool | null {
+  if (!hasMemoryToolContext(options)) {
+    return null;
+  }
+
+  let toolPromise: Promise<AnyAgentTool | null> | undefined;
+  const loadTool = async () => {
+    toolPromise ??= loadMemoryToolsModule().then((module) =>
+      module.createTagGraphTool({
+        agentId: options.agentId,
+        agentSessionKey: options.agentSessionKey,
+      }),
+    );
+    return await toolPromise;
+  };
+
+  return {
+    label: "Memory Tag Graph",
+    name: "memory_tag_neighbors",
+    description:
+      "Traverse the associative tag graph: given a tag (id or label), return co-occurring neighbor tags ranked by descending shared-target weight, each with a bounded sample of the target refs (box/span/turn) at the intersection. Read-only navigation over already-captured associations; returns an empty traversal when the tag is unknown or associative memory is off. Use it to discover related topics before a memory_search.",
+    parameters: MemoryTagNeighborsSchema,
+    execute: async (toolCallId, toolParams, signal, onUpdate) => {
+      const tool = await loadTool();
+      if (!tool) {
+        return jsonResult({ tag: null, neighbors: [] });
+      }
+      return await tool.execute(toolCallId, toolParams, signal, onUpdate);
+    },
+  };
+}
+
 function resolveMemoryToolOptions(ctx: OpenClawPluginToolContext): MemoryToolOptions {
   const getConfig = () => ctx.getRuntimeConfig?.() ?? ctx.runtimeConfig ?? ctx.config;
   return {
@@ -203,6 +249,10 @@ export default definePluginEntry({
 
     api.registerTool((ctx) => createLazyMemoryGetTool(resolveMemoryToolOptions(ctx)), {
       names: ["memory_get"],
+    });
+
+    api.registerTool((ctx) => createLazyTagGraphTool(resolveMemoryToolOptions(ctx)), {
+      names: ["memory_tag_neighbors"],
     });
 
     api.registerCommand({
