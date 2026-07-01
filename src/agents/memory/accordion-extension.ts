@@ -38,6 +38,13 @@ function buildRecalledMarkers(
   const labelById = new Map(boxes.map((box) => [box.box_id, box.label ?? box.summary]));
   const markers: AgentMessage[] = [];
   for (const boxId of recalledBoxIds) {
+    // Only mark a box that is actually in this turn's view. The injectedThisTurn registry is
+    // process-global and scoped only by agent/session, so it can still carry an entry from a
+    // prior turn or a box no longer present — emitting a marker for one of those would fabricate
+    // a phantom `recalled:` notice with the default label. Intersect with the current boxes.
+    if (!labelById.has(boxId)) {
+      continue;
+    }
     markers.push({
       role: "user",
       content: [{ type: "text", text: recalledMarkerText(labelById.get(boxId)) }],
