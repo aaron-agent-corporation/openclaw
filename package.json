@@ -1165,6 +1165,10 @@
       "types": "./dist/plugin-sdk/memory-core-host-associative.d.ts",
       "default": "./dist/plugin-sdk/memory-core-host-associative.js"
     },
+    "./plugin-sdk/memory-core-host-associative-write": {
+      "types": "./dist/plugin-sdk/memory-core-host-associative-write.d.ts",
+      "default": "./dist/plugin-sdk/memory-core-host-associative-write.js"
+    },
     "./plugin-sdk/memory-core-host-multimodal": {
       "types": "./dist/plugin-sdk/memory-core-host-multimodal.d.ts",
       "default": "./dist/plugin-sdk/memory-core-host-multimodal.js"

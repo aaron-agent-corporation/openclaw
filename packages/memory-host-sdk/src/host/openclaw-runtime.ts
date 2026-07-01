@@ -37,6 +37,21 @@ export {
   type TagGraphTraversal,
 } from "../../../../src/agents/memory/tag-graph.js";
 
+// Associative WRITE surface (05-01): the dreaming enrichment pass persists box
+// importance / rollups / summary_embedding_ref / DAG edges / associations / auto-expand.
+// These writes cross the plugin->core boundary; core validates every one and keeps
+// sole ownership of the turns/boxes/associative schema.
+export {
+  associateEnrichmentEntity,
+  associateEnrichmentTag,
+  autoExpandBox,
+  linkTagParent,
+  upsertEnrichmentEntity,
+  upsertEnrichmentTag,
+  writeBoxEnrichment,
+  type BoxEnrichment,
+} from "../../../../src/agents/memory/associative-enrichment-writes.js";
+
 // Session and reply helpers.
 export { isHeartbeatUserMessage } from "../../../../src/auto-reply/heartbeat-filter.js";
 export { HEARTBEAT_PROMPT } from "../../../../src/auto-reply/heartbeat.js";
