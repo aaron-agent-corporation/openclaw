@@ -43,3 +43,22 @@ export const SEGMENT_TOPIC_SIMILARITY_CUTOFF = 0.25;
  * normalized topic label before the tag-DAG slice maps labels to durable tags.
  */
 export const SEGMENT_TOPIC_TOKEN_LIMIT = 1;
+
+/**
+ * TUNABLE (Phase 5 — TUNE-02; spec §7). Additive importance weights for the
+ * dreaming enrichment score `w_r·norm(recurrence) + w_d·log(1+turn_depth) + w_e·effort`.
+ * Shipped as the spec defaults 0.4/0.3/0.3 (sum 1.0); Phase-5 stores the raw inputs so
+ * TUNE-02 can retune these against held-out spike boxes without re-deriving the score.
+ * Additive axes keep a recurrence=1 / high-effort thread from being zeroed (D11).
+ */
+export const IMPORTANCE_WEIGHT_RECURRENCE = 0.4;
+export const IMPORTANCE_WEIGHT_DEPTH = 0.3;
+export const IMPORTANCE_WEIGHT_EFFORT = 0.3;
+
+/**
+ * TUNABLE (Phase 5 — §7 normalization curve). Saturating half-saturation constant for the
+ * recurrence axis: `norm(recurrence) = recurrence / (recurrence + k)`. With k the axis is
+ * monotonic but bounded in [0,1), so an unbounded recurrence count cannot dominate the
+ * score regardless of the weight. k is the recurrence count at which the axis reaches 0.5.
+ */
+export const IMPORTANCE_RECURRENCE_HALF_SATURATION = 3;
