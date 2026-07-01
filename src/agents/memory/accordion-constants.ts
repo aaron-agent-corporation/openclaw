@@ -62,3 +62,27 @@ export const IMPORTANCE_WEIGHT_EFFORT = 0.3;
  * score regardless of the weight. k is the recurrence count at which the axis reaches 0.5.
  */
 export const IMPORTANCE_RECURRENCE_HALF_SATURATION = 3;
+
+/**
+ * TUNABLE (Phase 5 — §7/§13 bounded deep-pass). Per-night caps for the dreaming enrichment
+ * producer so the pass cannot run unbounded as the graph grows: at most this many boxes are
+ * enriched, and at most this many DAG parent edges are linked, per invocation. Enrichment is
+ * idempotent, so a capped run simply resumes uncovered boxes on the next night.
+ */
+export const ENRICHMENT_MAX_BOXES_PER_NIGHT = 200;
+export const ENRICHMENT_MAX_TAG_EDGES_PER_NIGHT = 100;
+
+/**
+ * TUNABLE (Phase 5 — §7 deep DAG). Minimum co-occurrence weight (shared durable targets)
+ * before the enrichment pass proposes a broader/narrower tag DAG parent edge. A parent must
+ * additionally co-occur across the child's whole shared-target set and span strictly more
+ * targets, so this floor need only require genuine (non-empty) co-occurrence; the structural
+ * broader-than test is what keeps the graph from over-connecting (recall-safety-first).
+ */
+export const ENRICHMENT_MIN_COOCCURRENCE_WEIGHT = 1;
+
+/** TUNABLE (Phase 5). Max non-noise turns folded into one box rollup summary. */
+export const ENRICHMENT_ROLLUP_MAX_TURNS = 6;
+
+/** TUNABLE (Phase 5). Max characters per rollup summary (bounded, local heuristic). */
+export const ENRICHMENT_ROLLUP_MAX_CHARS = 600;

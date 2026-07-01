@@ -27,9 +27,25 @@ export {
 // Read-only associative context (topic boxes + linked tags/entities) for search ranking.
 export {
   readAssociativeContext,
+  readBoxRollupInputs,
   type AssociativeBoxContext,
   type AssociativeContext,
+  type BoxRollupInputs,
 } from "../../../../src/agents/memory/associative-context.js";
+// §7 importance scorer + the single tunable enrichment-cap surface (TUNE-02). Exposed on the
+// read seam so the memory-core dreaming pass scores and bounds itself without importing core.
+export {
+  computeImportance,
+  type ImportanceInputs,
+  type ImportanceResult,
+} from "../../../../src/agents/memory/importance-score.js";
+export {
+  ENRICHMENT_MAX_BOXES_PER_NIGHT,
+  ENRICHMENT_MAX_TAG_EDGES_PER_NIGHT,
+  ENRICHMENT_MIN_COOCCURRENCE_WEIGHT,
+  ENRICHMENT_ROLLUP_MAX_CHARS,
+  ENRICHMENT_ROLLUP_MAX_TURNS,
+} from "../../../../src/agents/memory/accordion-constants.js";
 export {
   readTagCooccurrence,
   type TagGraphNeighbor,
@@ -46,11 +62,13 @@ export {
   associateEnrichmentTag,
   autoExpandBox,
   linkTagParent,
+  listEnrichmentTagEdges,
   upsertEnrichmentEntity,
   upsertEnrichmentTag,
   writeBoxEnrichment,
   type BoxEnrichment,
 } from "../../../../src/agents/memory/associative-enrichment-writes.js";
+export type { MemoryTagEdgeRow } from "../../../../src/agents/memory/associative-store.js";
 
 // Session and reply helpers.
 export { isHeartbeatUserMessage } from "../../../../src/auto-reply/heartbeat-filter.js";

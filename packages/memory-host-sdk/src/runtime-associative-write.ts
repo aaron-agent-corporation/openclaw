@@ -7,8 +7,10 @@ export {
   associateEnrichmentTag,
   autoExpandBox,
   linkTagParent,
+  listEnrichmentTagEdges,
   upsertEnrichmentEntity,
   upsertEnrichmentTag,
   writeBoxEnrichment,
   type BoxEnrichment,
+  type MemoryTagEdgeRow,
 } from "./host/openclaw-runtime.js";

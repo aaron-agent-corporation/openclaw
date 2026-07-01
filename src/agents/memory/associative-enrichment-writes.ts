@@ -14,10 +14,12 @@ import {
   associateMemoryEntity,
   associateMemoryTag,
   linkMemoryTagParent,
+  listMemoryTagEdges,
   upsertMemoryEntity,
   upsertMemoryTag,
   type MemoryAssociationSource,
   type MemoryAssociationTarget,
+  type MemoryTagEdgeRow,
 } from "./associative-store.js";
 import { listBoxes, setBoxState, upsertBox } from "./turns-store.js";
 
@@ -87,6 +89,14 @@ export function linkTagParent(
   },
 ): void {
   linkMemoryTagParent(options);
+}
+
+/**
+ * List the DAG parent edges. Read companion to `linkTagParent` so the enrichment pass can
+ * check which parent edges already exist (idempotent DAG maintenance) without a second seam.
+ */
+export function listEnrichmentTagEdges(options: OpenClawAgentDatabaseOptions): MemoryTagEdgeRow[] {
+  return listMemoryTagEdges(options);
 }
 
 /** Upsert a tag the dreaming pass discovered. Thin validated wrapper. */

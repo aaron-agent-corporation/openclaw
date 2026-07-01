@@ -72,11 +72,33 @@ export type MemoryHostDreamCompletedEvent = {
   storageMode: "inline" | "separate" | "both";
 };
 
+/**
+ * §13 decision-log event: one entry per box the dreaming enrichment pass processed,
+ * recording the importance score + raw inputs and the action taken (rollup / DAG link) so a
+ * later precision/recall review can audit every collapse/importance decision. Best-effort
+ * diagnostics, appended to the same JSONL audit log as the other dream events.
+ */
+export type MemoryHostEnrichBoxEvent = {
+  type: "memory.enrich.box";
+  timestamp: string;
+  agentId: string;
+  boxId: string;
+  /** Normalized §7 importance score in [0,1]. */
+  importance: number;
+  /** Raw importance inputs, stored so weights can be retuned without re-deriving (TUNE-02). */
+  inputs: { recurrenceCount: number; turnDepth: number; effortSignal: number };
+  /** Length of the generated rollup summary (chars); 0 when no rollup was written. */
+  summaryChars: number;
+  /** DAG parent edges linked for this box's tags in this pass. */
+  linkedParents: number;
+};
+
 /** Append-only memory host event schema stored as JSONL. */
 export type MemoryHostEvent =
   | MemoryHostRecallRecordedEvent
   | MemoryHostPromotionAppliedEvent
-  | MemoryHostDreamCompletedEvent;
+  | MemoryHostDreamCompletedEvent
+  | MemoryHostEnrichBoxEvent;
 
 /** Full event-log record schema, including opt-in diagnostic variants. */
 export type MemoryHostEventRecord = MemoryHostEvent | MemoryHostRecallSkippedEvent;
@@ -107,7 +129,8 @@ function parseMemoryHostEventRecord(line: string): MemoryHostEventRecord | null 
       record.type === "memory.recall.recorded" ||
       record.type === "memory.recall.skipped" ||
       record.type === "memory.promotion.applied" ||
-      record.type === "memory.dream.completed"
+      record.type === "memory.dream.completed" ||
+      record.type === "memory.enrich.box"
     ) {
       return record;
     }

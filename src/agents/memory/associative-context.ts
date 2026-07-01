@@ -7,7 +7,8 @@
  * narrow — callers do not get the raw row/store APIs.
  */
 import { listMemoryAssociations, listMemoryEntities, listMemoryTags } from "./associative-store.js";
-import { listBoxes, type BoxState } from "./turns-store.js";
+import { isSuppressedMemoryNoise } from "./noise.js";
+import { getTurns, listBoxes, listSpans, type BoxState } from "./turns-store.js";
 
 export type AssociativeBoxContext = {
   boxId: string;
@@ -78,6 +79,88 @@ export function readAssociativeContext(options: {
       entities: sortedFrom(entitiesByBox.get(box.box_id)),
     })),
   };
+}
+
+/**
+ * Non-noise turn content the dreaming enrichment pass rolls up for one box, in seq order.
+ * Kept to `role` + `content` so the producer can build a multi-turn rollup without the raw
+ * turn-row/store API. The importance axes are pre-derived here (core owns turn/span/noise
+ * logic) so the plugin only calls the pure §7 scorer over them.
+ */
+export type BoxRollupInputs = {
+  boxId: string;
+  topic: string | null;
+  /** Ordered non-noise turns owned by the box's spans. */
+  turns: Array<{ role: string; content: string }>;
+  /** Distinct owning spans — a topic re-visit signal (recurrence axis, §7). */
+  recurrenceCount: number;
+  /** Non-noise turns the box owns (turn-depth axis, §7). */
+  turnDepth: number;
+  /** Fraction of the box's non-noise turns that are tool/assistant work, in [0,1] (effort axis, §7). */
+  effortSignal: number;
+};
+
+/**
+ * Read the per-box rollup inputs for one agent session: the box's non-noise turns plus the
+ * normalized-input axes (recurrence / turn-depth / effort) the §7 importance formula needs.
+ * Read-only and tolerant of an empty store (returns no boxes). This is the single read
+ * surface the dreaming enrichment producer consumes to generate real rollups and importance
+ * without reaching into the raw turns/spans schema.
+ */
+export function readBoxRollupInputs(options: {
+  agentId: string;
+  sessionKey: string;
+  env?: NodeJS.ProcessEnv;
+}): BoxRollupInputs[] {
+  const scope = { agentId: options.agentId, sessionKey: options.sessionKey };
+  const dbOpts = options.env ? { ...scope, env: options.env } : scope;
+
+  const boxes = listBoxes(dbOpts);
+  if (boxes.length === 0) {
+    return [];
+  }
+  const turns = getTurns(dbOpts);
+  const spansByBox = new Map<string, Array<{ startSeq: number; endSeq: number }>>();
+  for (const span of listSpans(dbOpts)) {
+    if (span.box_id == null) {
+      continue;
+    }
+    const list = spansByBox.get(span.box_id) ?? [];
+    list.push({ startSeq: span.start_seq, endSeq: span.end_seq });
+    spansByBox.set(span.box_id, list);
+  }
+
+  return boxes.map((box) => {
+    const spans = (spansByBox.get(box.box_id) ?? []).toSorted((a, b) => a.startSeq - b.startSeq);
+    const owned: Array<{ role: string; content: string }> = [];
+    let effortful = 0;
+    for (const span of spans) {
+      for (const turn of turns) {
+        if (turn.seq < span.startSeq || turn.seq > span.endSeq) {
+          continue;
+        }
+        if (isSuppressedMemoryNoise(turn)) {
+          continue;
+        }
+        owned.push({ role: turn.role, content: turn.content });
+        // Effort proxy: assistant/tool turns carry the work signal (tool calls, reasoning);
+        // pure user prompts do not. Local, deterministic, no model call (§13).
+        if (turn.role !== "user") {
+          effortful += 1;
+        }
+      }
+    }
+    const turnDepth = owned.length;
+    const effortSignal = turnDepth === 0 ? 0 : effortful / turnDepth;
+    return {
+      boxId: box.box_id,
+      topic: box.label,
+      turns: owned,
+      recurrenceCount: spans.length,
+      turnDepth,
+      effortSignal,
+    };
+  });
 }
 
 function setInMap(map: Map<string, Set<string>>, key: string): Set<string> {
