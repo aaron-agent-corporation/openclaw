@@ -17,6 +17,12 @@ export type AssociativeBoxContext = {
   state: BoxState;
   tags: string[];
   entities: string[];
+  /**
+   * Normalized §7 importance ∈ [0,1] written by the dreaming enrichment pass (05-03), or
+   * null before a box has been enriched. Surfaced read-only so retrieval re-ranking (05-04)
+   * can weight a hit by how important its box is without reaching into the raw box row.
+   */
+  importance: number | null;
 };
 
 export type AssociativeContext = {
@@ -77,6 +83,7 @@ export function readAssociativeContext(options: {
       state: box.state === "collapsed" ? "collapsed" : "live",
       tags: sortedFrom(tagsByBox.get(box.box_id)),
       entities: sortedFrom(entitiesByBox.get(box.box_id)),
+      importance: typeof box.importance === "number" ? box.importance : null,
     })),
   };
 }
