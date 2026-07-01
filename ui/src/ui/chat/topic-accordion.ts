@@ -54,6 +54,13 @@ export function renderTopicAccordion(props: TopicAccordionProps) {
           >
             ${collapsed ? icons.chevronRight : icons.chevronDown}
             <span class="chat-topic__label">${boxDisplayLabel(box)}</span>
+            ${box.recalled
+              ? html`<span
+                  class="chat-topic__recalled"
+                  title=${t("chat.topics.recalled", { topic: boxDisplayLabel(box) })}
+                  >${t("chat.topics.recalled", { topic: boxDisplayLabel(box) })}</span
+                >`
+              : nothing}
           </button>
         `;
       })}

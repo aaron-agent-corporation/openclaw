@@ -1383,6 +1383,7 @@ export const pt_BR: TranslationMap = {
       collapse: "Recolher",
       expandTopic: "Expandir tópico {topic}",
       collapseTopic: "Recolher tópico {topic}",
+      recalled: "recuperado: {topic}",
     },
     composer: {
       placeholder: "Message {name} (Enter to send)",

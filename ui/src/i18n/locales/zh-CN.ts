@@ -1344,6 +1344,7 @@ export const zh_CN: TranslationMap = {
       collapse: "折叠",
       expandTopic: "展开主题 {topic}",
       collapseTopic: "折叠主题 {topic}",
+      recalled: "已撤回：{topic}",
     },
     composer: {
       placeholder: "给 {name} 发消息（Enter 发送）",

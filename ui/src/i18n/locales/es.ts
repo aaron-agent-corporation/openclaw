@@ -1389,6 +1389,7 @@ export const es: TranslationMap = {
       collapse: "Contraer",
       expandTopic: "Expandir tema {topic}",
       collapseTopic: "Contraer tema {topic}",
+      recalled: "recordado: {topic}",
     },
     composer: {
       placeholder: "Message {name} (Enter to send)",

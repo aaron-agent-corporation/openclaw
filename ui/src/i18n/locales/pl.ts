@@ -1386,6 +1386,7 @@ export const pl: TranslationMap = {
       collapse: "Zwiń",
       expandTopic: "Rozwiń temat {topic}",
       collapseTopic: "Zwiń temat {topic}",
+      recalled: "przywołano: {topic}",
     },
     composer: {
       placeholder: "Message {name} (Enter to send)",

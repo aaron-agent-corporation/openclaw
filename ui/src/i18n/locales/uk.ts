@@ -1385,6 +1385,7 @@ export const uk: TranslationMap = {
       collapse: "Згорнути",
       expandTopic: "Розгорнути тему {topic}",
       collapseTopic: "Згорнути тему {topic}",
+      recalled: "згадано: {topic}",
     },
     composer: {
       placeholder: "Message {name} (Enter to send)",

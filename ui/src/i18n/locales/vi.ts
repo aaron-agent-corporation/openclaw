@@ -1373,6 +1373,7 @@ export const vi: TranslationMap = {
       collapse: "Thu gọn",
       expandTopic: "Mở rộng chủ đề {topic}",
       collapseTopic: "Thu gọn chủ đề {topic}",
+      recalled: "đã nhớ lại: {topic}",
     },
     composer: {
       placeholder: "Message {name} (Enter to send)",

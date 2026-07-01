@@ -1372,6 +1372,7 @@ export const ko: TranslationMap = {
       collapse: "접기",
       expandTopic: "{topic} 주제 펼치기",
       collapseTopic: "{topic} 주제 접기",
+      recalled: "회상됨: {topic}",
     },
     composer: {
       placeholder: "Message {name} (Enter to send)",
