@@ -13,4 +13,11 @@ export {
   writeBoxEnrichment,
   type BoxEnrichment,
   type MemoryTagEdgeRow,
+  applyRetrievalAutoExpand,
+  resolveRetrievalAutoExpand,
+  injectedThisTurnBoxIds,
+  clearInjectedThisTurn,
+  ACCORDION_STRONG_MATCH_CUTOFF,
+  type RetrievalAutoExpandDecision,
+  type RetrievalAutoExpandLog,
 } from "./host/openclaw-runtime.js";

@@ -44,6 +44,7 @@ describe("readAssociativeContext", () => {
       state: "live",
       tags: [],
       entities: [],
+      importance: null,
     });
     expect(readAssociativeContext(s)).toEqual({ boxes: [] });
   });

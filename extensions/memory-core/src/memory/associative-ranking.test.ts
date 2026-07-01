@@ -15,6 +15,7 @@ function context(boxes: Partial<AssociativeContext["boxes"][number]>[]): Associa
       state: box.state ?? "live",
       tags: box.tags ?? [],
       entities: box.entities ?? [],
+      importance: box.importance ?? null,
     })),
   };
 }

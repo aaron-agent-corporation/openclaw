@@ -70,6 +70,20 @@ export {
 } from "../../../../src/agents/memory/associative-enrichment-writes.js";
 export type { MemoryTagEdgeRow } from "../../../../src/agents/memory/associative-store.js";
 
+// Accordion-aware retrieval auto-expand (05-04 / RETR-01): the accordion-aware query mode runs
+// the strong-match decision and, on a strong match, flips a collapsed box to live via the write
+// path above so the current turn renders it verbatim. The injected-this-turn registry drives the
+// recalled marker. Conservative, recall-safety-first, decision-logged — no silent fallback.
+export {
+  applyRetrievalAutoExpand,
+  resolveRetrievalAutoExpand,
+  injectedThisTurnBoxIds,
+  clearInjectedThisTurn,
+  type RetrievalAutoExpandDecision,
+  type RetrievalAutoExpandLog,
+} from "../../../../src/agents/memory/accordion-auto-expand.js";
+export { ACCORDION_STRONG_MATCH_CUTOFF } from "../../../../src/agents/memory/accordion-constants.js";
+
 // Session and reply helpers.
 export { isHeartbeatUserMessage } from "../../../../src/auto-reply/heartbeat-filter.js";
 export { HEARTBEAT_PROMPT } from "../../../../src/auto-reply/heartbeat.js";

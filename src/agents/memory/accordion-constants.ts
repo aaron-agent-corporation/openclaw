@@ -86,3 +86,14 @@ export const ENRICHMENT_ROLLUP_MAX_TURNS = 6;
 
 /** TUNABLE (Phase 5). Max characters per rollup summary (bounded, local heuristic). */
 export const ENRICHMENT_ROLLUP_MAX_CHARS = 600;
+
+/**
+ * TUNABLE (Phase 5 — TUNE-02; spec §6.4/§9 conservative strong-match auto-expand). The
+ * retrieval-match score (normalized token overlap between the turn query and an indexed
+ * box/entity/tag rollup, [0,1]) at or above which the accordion-aware query mode auto-expands
+ * the matched collapsed box for the current turn. Shipped as a deliberately CONSERVATIVE default
+ * (strong-match only, recall-safety-first D-07/D-09): a weak/near-threshold match must NOT
+ * auto-expand — better to leave a box collapsed than to surface the wrong old matter. The
+ * replay precision/recall harness (05-05) retunes this against held-out data.
+ */
+export const ACCORDION_STRONG_MATCH_CUTOFF = 0.6;

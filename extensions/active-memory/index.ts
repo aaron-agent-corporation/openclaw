@@ -16,6 +16,11 @@ import {
   resolveDefaultModelForAgent,
 } from "openclaw/plugin-sdk/agent-runtime";
 import type { OpenClawConfig } from "openclaw/plugin-sdk/config-contracts";
+import { readAssociativeContext } from "openclaw/plugin-sdk/memory-core-host-associative";
+import {
+  applyRetrievalAutoExpand,
+  injectedThisTurnBoxIds,
+} from "openclaw/plugin-sdk/memory-core-host-associative-write";
 import { closeActiveMemorySearchManager } from "openclaw/plugin-sdk/memory-host-search";
 import {
   asDateTimestampMs,
@@ -37,6 +42,7 @@ import {
   uniqueStrings,
 } from "openclaw/plugin-sdk/string-coerce-runtime";
 import { tempWorkspace, resolvePreferredOpenClawTmpDir } from "openclaw/plugin-sdk/temp-path";
+import { isAccordionAwareQueryMode, runAccordionAwareAutoExpand } from "./accordion-aware.js";
 
 const DEFAULT_TIMEOUT_MS = 15_000;
 const DEFAULT_AGENT_ID = "main";
@@ -181,7 +187,7 @@ type ActiveRecallPluginConfig = {
   promptAppend?: string;
   timeoutMs?: number;
   setupGraceTimeoutMs?: number;
-  queryMode?: "message" | "recent" | "full";
+  queryMode?: "message" | "recent" | "full" | "accordion-aware";
   maxSummaryChars?: number;
   recentUserTurns?: number;
   recentAssistantTurns?: number;
@@ -222,7 +228,7 @@ type ResolvedActiveRecallPluginConfig = {
   promptAppend?: string;
   timeoutMs: number;
   setupGraceTimeoutMs: number;
-  queryMode: "message" | "recent" | "full";
+  queryMode: "message" | "recent" | "full" | "accordion-aware";
   maxSummaryChars: number;
   recentUserTurns: number;
   recentAssistantTurns: number;
@@ -885,7 +891,10 @@ function normalizePluginConfig(
       MAX_SETUP_GRACE_TIMEOUT_MS,
     ),
     queryMode:
-      raw.queryMode === "message" || raw.queryMode === "recent" || raw.queryMode === "full"
+      raw.queryMode === "message" ||
+      raw.queryMode === "recent" ||
+      raw.queryMode === "full" ||
+      raw.queryMode === "accordion-aware"
         ? raw.queryMode
         : DEFAULT_QUERY_MODE,
     maxSummaryChars: clampInt(raw.maxSummaryChars, DEFAULT_MAX_SUMMARY_CHARS, 40, 1000),
@@ -3692,6 +3701,33 @@ export default definePluginEntry({
               latestUserMessage: event.prompt,
               recentTurns,
             });
+            // Accordion-aware queryMode (05-04 / RETR-01): before the model turn, conservatively
+            // auto-expand the best strong-match collapsed box so its verbatim context is present
+            // for THIS turn (no one-turn lag). No silent fallback — a weak match simply does not
+            // expand. Best-effort: an auto-expand failure never blocks the recall path.
+            if (isAccordionAwareQueryMode(invocationConfig.queryMode) && resolvedSessionKey) {
+              try {
+                runAccordionAwareAutoExpand({
+                  agentId: effectiveAgentId,
+                  sessionKey: resolvedSessionKey,
+                  query,
+                  readAssociativeContext,
+                  applyRetrievalAutoExpand,
+                  injectedThisTurnBoxIds,
+                  logDecision: (log) => {
+                    if (invocationConfig.logging) {
+                      api.logger.debug?.(
+                        `active-memory: accordion-aware decision box=${log.boxId ?? "none"} score=${log.score.toFixed(3)} cutoff=${log.cutoff.toFixed(3)} expanded=${String(log.expanded)}`,
+                      );
+                    }
+                  },
+                });
+              } catch (autoExpandError) {
+                api.logger.debug?.(
+                  `active-memory: accordion-aware auto-expand skipped: ${toSingleLineLogValue(autoExpandError instanceof Error ? autoExpandError.message : String(autoExpandError))}`,
+                );
+              }
+            }
             // Start recall with its full configured budget. The preceding
             // session/config checks must not consume abort-settlement time.
             armHookDeadline(liveRecallTimeoutMs, "recall");

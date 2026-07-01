@@ -93,12 +93,33 @@ export type MemoryHostEnrichBoxEvent = {
   linkedParents: number;
 };
 
+/**
+ * §13 decision-log record for one accordion-aware retrieval auto-expand decision (05-04 /
+ * RETR-01). One record per turn where the accordion-aware query mode evaluated a strong-match
+ * escalation, carrying the score and whether the box was expanded so the 05-05 replay harness
+ * can score precision/recall against held-out data (recall-safety-first, D-03).
+ */
+export type MemoryHostAutoExpandDecisionEvent = {
+  type: "memory.autoexpand.decision";
+  timestamp: string;
+  agentId: string;
+  /** The best-matching collapsed box, or null when nothing matched. */
+  boxId: string | null;
+  /** Normalized retrieval-match score of the best candidate, [0,1]. */
+  score: number;
+  /** The conservative strong-match cutoff in force for this decision. */
+  cutoff: number;
+  /** True when the score cleared the cutoff and the box was flipped to live this turn. */
+  expanded: boolean;
+};
+
 /** Append-only memory host event schema stored as JSONL. */
 export type MemoryHostEvent =
   | MemoryHostRecallRecordedEvent
   | MemoryHostPromotionAppliedEvent
   | MemoryHostDreamCompletedEvent
-  | MemoryHostEnrichBoxEvent;
+  | MemoryHostEnrichBoxEvent
+  | MemoryHostAutoExpandDecisionEvent;
 
 /** Full event-log record schema, including opt-in diagnostic variants. */
 export type MemoryHostEventRecord = MemoryHostEvent | MemoryHostRecallSkippedEvent;
@@ -130,7 +151,8 @@ function parseMemoryHostEventRecord(line: string): MemoryHostEventRecord | null 
       record.type === "memory.recall.skipped" ||
       record.type === "memory.promotion.applied" ||
       record.type === "memory.dream.completed" ||
-      record.type === "memory.enrich.box"
+      record.type === "memory.enrich.box" ||
+      record.type === "memory.autoexpand.decision"
     ) {
       return record;
     }

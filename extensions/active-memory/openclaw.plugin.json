@@ -43,7 +43,7 @@
       "setupGraceTimeoutMs": { "type": "integer", "minimum": 0, "maximum": 30000 },
       "queryMode": {
         "type": "string",
-        "enum": ["message", "recent", "full"]
+        "enum": ["message", "recent", "full", "accordion-aware"]
       },
       "promptStyle": {
         "type": "string",
@@ -132,7 +132,7 @@
     },
     "queryMode": {
       "label": "Query Mode",
-      "help": "Choose whether the blocking memory sub-agent sees only the latest user message, a small recent tail, or the full conversation."
+      "help": "Choose whether the blocking memory sub-agent sees only the latest user message, a small recent tail, or the full conversation. accordion-aware additionally auto-expands a strongly-matched collapsed topic back into context for the current turn."
     },
     "promptStyle": {
       "label": "Prompt Style",
