@@ -195,6 +195,7 @@ export function upsertBox(
       label?: string | null;
       state?: BoxState;
       summary?: string | null;
+      summaryEmbeddingRef?: string | null;
       importance?: number | null;
       suppressionRollup?: string | null;
       lastActiveSeq?: number | null;
@@ -214,6 +215,7 @@ export function upsertBox(
           label: box.label ?? null,
           ...(box.state ? { state: box.state } : {}),
           summary: box.summary ?? null,
+          summary_embedding_ref: box.summaryEmbeddingRef ?? null,
           importance: box.importance ?? null,
           suppression_rollup: box.suppressionRollup ?? null,
           last_active_seq: box.lastActiveSeq ?? null,
@@ -223,6 +225,7 @@ export function upsertBox(
             label: box.label ?? null,
             ...(box.state ? { state: box.state } : {}),
             summary: box.summary ?? null,
+            summary_embedding_ref: box.summaryEmbeddingRef ?? null,
             importance: box.importance ?? null,
             suppression_rollup: box.suppressionRollup ?? null,
             last_active_seq: box.lastActiveSeq ?? null,
