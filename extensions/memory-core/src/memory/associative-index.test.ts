@@ -18,6 +18,8 @@ function context(boxes: Partial<AssociativeContext["boxes"][number]>[]): Associa
       tags: box.tags ?? [],
       entities: box.entities ?? [],
       importance: box.importance ?? null,
+      summaryEmbeddingRef: box.summaryEmbeddingRef ?? null,
+      suppressionRollup: box.suppressionRollup ?? null,
     })),
   };
 }
@@ -43,6 +45,35 @@ describe("buildAssociativeIndexRecords", () => {
     expect(box?.importance).toBe(0.8);
     expect(box?.boxId).toBe("b1");
     expect(box?.text).toContain("Fidel");
+  });
+
+  it("carries the box summary_embedding_ref as indexRef and topic/tags as recallKeys", () => {
+    const records = buildAssociativeIndexRecords(
+      context([
+        {
+          boxId: "b1",
+          topic: "Fidel case",
+          summary: "Rollup of the Fidel litigation strategy.",
+          entities: ["Fidel"],
+          tags: ["litigation"],
+          summaryEmbeddingRef: "rollup:b1:deadbeef",
+        },
+      ]),
+    );
+    // Every record projected from the box pins the exact enriched-rollup version it matched.
+    for (const record of records) {
+      expect(record.indexRef).toBe("rollup:b1:deadbeef");
+      expect(record.recallKeys).toEqual(["fidel case", "litigation"]);
+      expect(record.entityKeys).toEqual(["fidel"]);
+    }
+  });
+
+  it("indexes a topic-only box (not-yet-summarized) so its topic recall key survives", () => {
+    const records = buildAssociativeIndexRecords(context([{ boxId: "t", topic: "Fidel case" }]));
+    expect(records.map((r) => r.kind)).toEqual(["box"]);
+    expect(records[0]?.text).toBe("Fidel case");
+    expect(records[0]?.recallKeys).toEqual(["fidel case"]);
+    expect(records[0]?.indexRef).toBeNull();
   });
 
   it("returns no records for an empty associative store (no second slot to populate)", () => {

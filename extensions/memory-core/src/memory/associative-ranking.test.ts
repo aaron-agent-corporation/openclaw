@@ -16,6 +16,8 @@ function context(boxes: Partial<AssociativeContext["boxes"][number]>[]): Associa
       tags: box.tags ?? [],
       entities: box.entities ?? [],
       importance: box.importance ?? null,
+      summaryEmbeddingRef: box.summaryEmbeddingRef ?? null,
+      suppressionRollup: box.suppressionRollup ?? null,
     })),
   };
 }

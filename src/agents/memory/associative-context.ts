@@ -23,6 +23,20 @@ export type AssociativeBoxContext = {
    * can weight a hit by how important its box is without reaching into the raw box row.
    */
   importance: number | null;
+  /**
+   * Content-derived version ref for the box's rollup summary written by the dreaming pass
+   * (05-03), or null before enrichment. Surfaced read-only (05-06) so the associative index
+   * record can carry it as `indexRef` and the auto-expand decision log can pin a decision to
+   * the exact enriched-rollup version it matched.
+   */
+  summaryEmbeddingRef: string | null;
+  /**
+   * Short deterministic low-salience note written by the dreaming pass (05-06) for a box below
+   * the importance floor, or null. Surfaced read-only so the retrieval auto-expand scorer can
+   * require a higher effective cutoff for a suppressed box on a LEXICAL-only match — an
+   * exact-entity mention is never suppressed (recall-safety-first, D-07/D-09).
+   */
+  suppressionRollup: string | null;
 };
 
 export type AssociativeContext = {
@@ -84,6 +98,8 @@ export function readAssociativeContext(options: {
       tags: sortedFrom(tagsByBox.get(box.box_id)),
       entities: sortedFrom(entitiesByBox.get(box.box_id)),
       importance: typeof box.importance === "number" ? box.importance : null,
+      summaryEmbeddingRef: box.summary_embedding_ref ?? null,
+      suppressionRollup: box.suppression_rollup ?? null,
     })),
   };
 }

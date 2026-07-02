@@ -14,10 +14,8 @@
  * associative store is empty (the default when conversational memory is off), so out-of-the-box
  * search behavior is unchanged.
  */
-import type {
-  AssociativeContext,
-  AssociativeBoxContext,
-} from "openclaw/plugin-sdk/memory-core-host-associative";
+import type { AssociativeContext } from "openclaw/plugin-sdk/memory-core-host-associative";
+import { buildAssociativeIndexRecords } from "./associative-index.js";
 
 // TUNABLE (Phase 4): multiplicative score nudge for a hit that mentions any recall key.
 // Small on purpose — associative context reorders near-ties, it does not dominate relevance.
@@ -29,44 +27,36 @@ const ENTITY_KEY_BOOST = 0.6;
 // TUNABLE (Phase 5): importance only breaks near-ties (it must not dominate text/vector
 // relevance), so its contribution is a small fraction of the base score.
 const IMPORTANCE_TIEBREAK_WEIGHT = 0.05;
-// Ignore very short labels; they match too much to be meaningful recall keys.
-const MIN_LABEL_LENGTH = 3;
 
-type BoxKey = { key: string; box: AssociativeBoxContext; isEntity: boolean };
-
-function normalizeLabel(label: string | null | undefined): string | null {
-  const key = label?.trim().toLowerCase();
-  return key != null && key.length >= MIN_LABEL_LENGTH ? key : null;
-}
+type BoxKey = { key: string; importance: number | null; isEntity: boolean };
 
 /**
- * Collect the distinct lowercased recall keys with their owning box + whether the key is an
- * exact entity key (vs a coarser topic/tag). Entity keys win over topic/tag keys on the same
- * string so an exact entity mention is scored at the stronger boost.
+ * Collect the distinct lowercased recall keys with their owning box's importance + whether the
+ * key is an exact entity key (vs a coarser topic/tag). Keys are read from the shared associative
+ * index projection (`buildAssociativeIndexRecords`) rather than re-derived inline, so the index
+ * has a real production caller (05-06). Entity keys win over topic/tag keys on the same string
+ * so an exact entity mention is scored at the stronger boost; the higher-importance owning box
+ * wins a shared key.
  */
 function boxKeys(context: AssociativeContext): BoxKey[] {
   const byKey = new Map<string, BoxKey>();
-  for (const box of context.boxes) {
-    const register = (label: string | null | undefined, isEntity: boolean) => {
-      const key = normalizeLabel(label);
-      if (key == null) {
-        return;
-      }
-      const existing = byKey.get(key);
-      // Prefer the entity classification and the higher-importance owning box for a shared key.
-      if (
-        existing == null ||
-        (isEntity && !existing.isEntity) ||
-        (isEntity === existing.isEntity && (box.importance ?? 0) > (existing.box.importance ?? 0))
-      ) {
-        byKey.set(key, { key, box, isEntity });
-      }
-    };
-    for (const entity of box.entities) {
-      register(entity, true);
+  const register = (key: string, importance: number | null, isEntity: boolean) => {
+    const existing = byKey.get(key);
+    if (
+      existing == null ||
+      (isEntity && !existing.isEntity) ||
+      (isEntity === existing.isEntity && (importance ?? 0) > (existing.importance ?? 0))
+    ) {
+      byKey.set(key, { key, importance, isEntity });
     }
-    for (const label of [box.topic, ...box.tags]) {
-      register(label, false);
+  };
+  for (const record of buildAssociativeIndexRecords(context)) {
+    // Entity keys first so the entity classification wins a key shared with a topic/tag.
+    for (const key of record.entityKeys) {
+      register(key, record.importance, true);
+    }
+    for (const key of record.recallKeys) {
+      register(key, record.importance, false);
     }
   }
   return Array.from(byKey.values());
@@ -111,7 +101,7 @@ export function augmentMemoryResultsWithAssociativeContext<
     }
     const boost = matchedEntity ? entityBoost : keyBoost;
     // Importance breaks near-ties without dominating relevance.
-    const importanceLift = 1 + IMPORTANCE_TIEBREAK_WEIGHT * (matched.box.importance ?? 0);
+    const importanceLift = 1 + IMPORTANCE_TIEBREAK_WEIGHT * (matched.importance ?? 0);
     return {
       result,
       index,
