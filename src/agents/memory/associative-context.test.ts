@@ -45,6 +45,8 @@ describe("readAssociativeContext", () => {
       tags: [],
       entities: [],
       importance: null,
+      summaryEmbeddingRef: null,
+      suppressionRollup: null,
     });
     expect(readAssociativeContext(s)).toEqual({ boxes: [] });
   });

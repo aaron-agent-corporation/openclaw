@@ -64,6 +64,8 @@ describe("readAccordionView recalled flag", () => {
             tags: [],
             entities: ["Fidel"],
             importance: 0.5,
+            summaryEmbeddingRef: null,
+            suppressionRollup: null,
           },
         ],
       },
