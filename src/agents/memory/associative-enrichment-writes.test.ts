@@ -12,7 +12,7 @@ import {
   writeBoxEnrichment,
 } from "./associative-enrichment-writes.js";
 import { upsertMemoryTag } from "./associative-store.js";
-import { listBoxes, upsertBox } from "./turns-store.js";
+import { appendTurns, listBoxes, upsertBox } from "./turns-store.js";
 
 function createTempStateDir(): string {
   return fs.mkdtempSync(path.join(os.tmpdir(), "openclaw-enrichment-writes-"));
@@ -102,8 +102,15 @@ describe("associative-enrichment-writes", () => {
     ).toThrow(/boxId/);
   });
 
-  it("autoExpandBox flips a collapsed box to live", () => {
+  it("autoExpandBox flips a collapsed box to live and stamps recalled_at_seq to the head", () => {
     const s = scope(createTempStateDir());
+    appendTurns({
+      ...s,
+      turns: [
+        { role: "user", content: "a", contentHash: "ha", idempotencyKey: "k1", ts: 1 },
+        { role: "assistant", content: "b", contentHash: "hb", idempotencyKey: "k2", ts: 2 },
+      ],
+    });
     upsertBox({
       ...s,
       box: { boxId: "box-1", sessionKey: s.sessionKey, label: "Memory", state: "collapsed" },
@@ -111,6 +118,8 @@ describe("associative-enrichment-writes", () => {
     autoExpandBox({ ...s, boxId: "box-1" });
     const [box] = listBoxes({ ...s, sessionKey: s.sessionKey });
     expect(box.state).toBe("live");
+    // Stamped to the current head seq (2) so the recalled marker shows for exactly this turn.
+    expect(box.recalled_at_seq).toBe(2);
   });
 
   it("linkTagParent preserves the cycle guard", () => {

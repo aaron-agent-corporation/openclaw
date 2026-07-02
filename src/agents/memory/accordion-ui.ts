@@ -6,8 +6,7 @@
  * box → seq-range mapping for a later inline-fold consumer; both are read-only views of
  * the canonical store — the UI never mutates turns, only flips state via the gateway.
  */
-import { injectedThisTurnBoxIds } from "./accordion-auto-expand.js";
-import { listBoxes, listSpans } from "./turns-store.js";
+import { listBoxes, listSpans, readHeadSeq } from "./turns-store.js";
 
 export type AccordionBoxView = {
   id: string;
@@ -46,13 +45,16 @@ export type AccordionView = {
 
 /** Project the per-agent store's boxes/spans into the UI-facing accordion shape. */
 export function readAccordionView(scope: { agentId: string; sessionKey: string }): AccordionView {
-  const recalledBoxIds = new Set(injectedThisTurnBoxIds(scope));
+  // A box is "recalled" iff it is live AND its retrieval auto-expand stamped the current head
+  // seq — durable, self-clearing signal (see boxes.recalled_at_seq). null head (no turns yet)
+  // matches nothing, so nothing is spuriously flagged.
+  const headSeq = readHeadSeq(scope);
   const boxes = listBoxes(scope).map((box) => ({
     id: box.box_id,
     label: box.label,
     state: box.state === "collapsed" ? ("collapsed" as const) : ("live" as const),
     summary: box.summary,
-    recalled: recalledBoxIds.has(box.box_id),
+    recalled: box.state !== "collapsed" && headSeq != null && box.recalled_at_seq === headSeq,
   }));
   const spans = listSpans(scope).map((span) => ({
     boxId: span.box_id,

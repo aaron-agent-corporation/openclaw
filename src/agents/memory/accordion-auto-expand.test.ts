@@ -1,13 +1,10 @@
 // 05-04 Task 2: conservative strong-match retrieval auto-expand decision. A strong match
-// (score ≥ cutoff) expands the matched collapsed box and marks it injectedThisTurn; a weak
-// match does neither and there is NO silent fallback. Decisions are logged with their score.
+// (score ≥ cutoff) resolves to expanding the matched collapsed box; a weak match does not and
+// there is NO silent fallback. The decision is PURE — it mutates no shared state. Decisions are
+// logged with their score.
 import type { AssociativeContext } from "openclaw/plugin-sdk/memory-core-host-associative";
-import { describe, expect, it, beforeEach } from "vitest";
-import {
-  clearInjectedThisTurn,
-  injectedThisTurnBoxIds,
-  resolveRetrievalAutoExpand,
-} from "./accordion-auto-expand.js";
+import { describe, expect, it } from "vitest";
+import { resolveRetrievalAutoExpand } from "./accordion-auto-expand.js";
 import {
   ACCORDION_STRONG_MATCH_CUTOFF,
   ACCORDION_SUPPRESSION_CUTOFF_BUMP,
@@ -32,9 +29,7 @@ function context(boxes: Partial<AssociativeContext["boxes"][number]>[]): Associa
 const scope = { agentId: "a", sessionKey: "agent:a:main" };
 
 describe("resolveRetrievalAutoExpand", () => {
-  beforeEach(() => clearInjectedThisTurn(scope));
-
-  it("expands a collapsed box on a strong match and marks it injectedThisTurn", () => {
+  it("expands a collapsed box on a strong match", () => {
     const decision = resolveRetrievalAutoExpand({
       query: "what did we decide on the Fidel litigation strategy",
       context: context([
@@ -50,7 +45,6 @@ describe("resolveRetrievalAutoExpand", () => {
     expect(decision.expanded).toBe(true);
     expect(decision.boxId).toBe("b1");
     expect(decision.score).toBeGreaterThanOrEqual(ACCORDION_STRONG_MATCH_CUTOFF);
-    expect(injectedThisTurnBoxIds(scope)).toContain("b1");
   });
 
   it("does NOT expand on a weak/near-threshold match (conservative, strong-match only)", () => {
@@ -68,7 +62,34 @@ describe("resolveRetrievalAutoExpand", () => {
     });
     expect(decision.expanded).toBe(false);
     expect(decision.score).toBeLessThan(ACCORDION_STRONG_MATCH_CUTOFF);
-    expect(injectedThisTurnBoxIds(scope)).toHaveLength(0);
+  });
+
+  it("is PURE: repeated calls do not mutate shared state (safe to replay)", () => {
+    // Regression for the deleted process-global injectedThisTurn map: resolving a strong match,
+    // then a weak one for the same scope, must not let the first call leak into the second.
+    const strongContext = context([
+      { boxId: "b1", topic: "Fidel litigation strategy", entities: ["Fidel"] },
+    ]);
+    const first = resolveRetrievalAutoExpand({
+      query: "the Fidel litigation strategy",
+      context: strongContext,
+      ...scope,
+    });
+    const second = resolveRetrievalAutoExpand({
+      query: "the stock market rally continued",
+      context: context([{ boxId: "b2", topic: "weather forecast tomorrow", entities: [] }]),
+      ...scope,
+    });
+    // Re-running the exact first call yields an identical decision — no accumulated state.
+    const firstAgain = resolveRetrievalAutoExpand({
+      query: "the Fidel litigation strategy",
+      context: strongContext,
+      ...scope,
+    });
+    expect(first.expanded).toBe(true);
+    expect(second.expanded).toBe(false);
+    expect(second.boxId).toBeNull();
+    expect(firstAgain).toEqual(first);
   });
 
   it("only considers collapsed boxes (a live box is already in context)", () => {
@@ -150,7 +171,7 @@ describe("resolveRetrievalAutoExpand", () => {
     });
     // Same overlap that expanded the control box does NOT clear the raised bar.
     expect(decision.expanded).toBe(false);
-    expect(injectedThisTurnBoxIds(scope)).toHaveLength(0);
+    expect(decision.boxId).toBeNull();
   });
 
   it("NEVER suppresses an exact-entity mention — a precise reference to a suppressed topic still auto-expands (recall-safety-first, D-07/D-09)", () => {

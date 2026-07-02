@@ -6,12 +6,14 @@
  * fallback to a weaker query.
  *
  * Split:
- *   - `resolveRetrievalAutoExpand` is the pure decision (query + associative context → best
- *     collapsed box + normalized score + expand/no-expand). It marks an expanded box in the
- *     in-memory `injectedThisTurn` registry that the accordion render (recalled marker, Task 3)
- *     consumes; it performs NO store write, so it is unit-testable without a DB.
+ *   - `resolveRetrievalAutoExpand` is the PURE decision (query + associative context → best
+ *     collapsed box + normalized score + expand/no-expand). It mutates no module state and
+ *     performs NO store write, so it is unit-testable without a DB and safe to replay (the
+ *     replay-eval gate reuses it against a real agent's store without polluting render state).
  *   - `applyRetrievalAutoExpand` runs the decision, and on a strong match flips the box to live
- *     via the 05-01 `autoExpandBox` write path and appends the §13 decision-log event.
+ *     via the 05-01 `autoExpandBox` write path — which durably stamps `recalled_at_seq` to the
+ *     current head so the recalled marker/badge (accordion-extension / accordion-ui) shows for
+ *     exactly this turn — and appends the §13 decision-log event.
  *
  * The score is a normalized lexical overlap between the query and each collapsed box's indexed
  * rollup text + labels, with an exact entity-key mention treated as a strong precision signal.
@@ -48,32 +50,6 @@ export type RetrievalAutoExpandDecision = {
    */
   suppressed: boolean;
 };
-
-// Per-agent-session set of boxes auto-expanded by retrieval this turn. Process-local and
-// cleared at the start of each turn's evaluation — this is transient render state, not
-// durable store data (a re-collapse next turn is a normal accordion outcome, not data loss).
-const injectedThisTurn = new Map<string, Set<string>>();
-
-function registryKey(scope: { agentId: string; sessionKey: string }): string {
-  return `${scope.agentId} ${scope.sessionKey}`;
-}
-
-/** Box ids auto-expanded by retrieval this turn for the given scope. */
-export function injectedThisTurnBoxIds(scope: { agentId: string; sessionKey: string }): string[] {
-  return Array.from(injectedThisTurn.get(registryKey(scope)) ?? []);
-}
-
-/** Reset the injected-this-turn registry for a scope (called at the start of a turn). */
-export function clearInjectedThisTurn(scope: { agentId: string; sessionKey: string }): void {
-  injectedThisTurn.delete(registryKey(scope));
-}
-
-function markInjectedThisTurn(scope: { agentId: string; sessionKey: string }, boxId: string): void {
-  const key = registryKey(scope);
-  const set = injectedThisTurn.get(key) ?? new Set<string>();
-  set.add(boxId);
-  injectedThisTurn.set(key, set);
-}
 
 function tokenize(text: string): string[] {
   return text
@@ -115,9 +91,10 @@ function scoreBoxMatch(
 
 /**
  * Pure decision: score the query against every COLLAPSED box's enriched rollup and pick the
- * best. On a strong match (≥ cutoff) mark the box injectedThisTurn and return `expanded: true`.
- * Empty store or weak best → `expanded: false` with the best score (no downgraded query — the
- * caller must NOT silently fall back to a weaker mode, §9).
+ * best. On a strong match (≥ cutoff) return `expanded: true` with the winning box. Empty store
+ * or weak best → `expanded: false` with the best score (no downgraded query — the caller must
+ * NOT silently fall back to a weaker mode, §9). Mutates no module state and writes no store, so
+ * replaying it against a real agent's store never pollutes render/marker state.
  */
 export function resolveRetrievalAutoExpand(params: {
   agentId: string;
@@ -157,9 +134,6 @@ export function resolveRetrievalAutoExpand(params: {
     }
   }
   const expanded = bestBoxId != null;
-  if (expanded && bestBoxId != null) {
-    markInjectedThisTurn(params, bestBoxId);
-  }
   return {
     boxId: expanded ? bestBoxId : null,
     score: expanded ? bestScore : topScore,
@@ -199,7 +173,12 @@ export function applyRetrievalAutoExpand(params: {
   const decision = resolveRetrievalAutoExpand(params);
   if (decision.expanded && decision.boxId != null) {
     try {
-      autoExpandBox({ agentId: params.agentId, boxId: decision.boxId, env: params.env });
+      autoExpandBox({
+        agentId: params.agentId,
+        sessionKey: params.sessionKey,
+        boxId: decision.boxId,
+        env: params.env,
+      });
     } catch {
       // Never break a turn over an auto-expand flip; the box just stays collapsed.
     }

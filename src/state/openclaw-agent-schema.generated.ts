@@ -178,6 +178,9 @@ CREATE INDEX IF NOT EXISTS idx_spans_box
 
 -- A topic that owns one or more (possibly non-contiguous) spans. Collapse/expand
 -- flips state; summary/importance/suppression_rollup are dreaming-maintained (Phase 3).
+-- recalled_at_seq records the head seq at which a retrieval auto-expand flipped the box
+-- back to live (Phase 5, 05-04); the recalled marker/badge shows iff the box is live AND
+-- recalled_at_seq equals the current head seq, so the signal self-clears next turn.
 CREATE TABLE IF NOT EXISTS boxes (
   box_id TEXT NOT NULL PRIMARY KEY,
   session_key TEXT NOT NULL,
@@ -187,7 +190,8 @@ CREATE TABLE IF NOT EXISTS boxes (
   summary_embedding_ref TEXT,
   importance REAL,
   suppression_rollup TEXT,
-  last_active_seq INTEGER
+  last_active_seq INTEGER,
+  recalled_at_seq INTEGER
 );
 
 CREATE INDEX IF NOT EXISTS idx_boxes_session

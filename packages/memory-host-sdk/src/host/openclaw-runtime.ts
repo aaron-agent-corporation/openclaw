@@ -78,8 +78,6 @@ export type { MemoryTagEdgeRow } from "../../../../src/agents/memory/associative
 export {
   applyRetrievalAutoExpand,
   resolveRetrievalAutoExpand,
-  injectedThisTurnBoxIds,
-  clearInjectedThisTurn,
   type RetrievalAutoExpandDecision,
   type RetrievalAutoExpandLog,
 } from "../../../../src/agents/memory/accordion-auto-expand.js";

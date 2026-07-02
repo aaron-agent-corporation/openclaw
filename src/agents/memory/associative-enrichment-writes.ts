@@ -21,7 +21,7 @@ import {
   type MemoryAssociationTarget,
   type MemoryTagEdgeRow,
 } from "./associative-store.js";
-import { listBoxes, setBoxState, upsertBox } from "./turns-store.js";
+import { listBoxes, setBoxRecalledLive, upsertBox } from "./turns-store.js";
 
 function assertNonBlank(value: string, field: string): string {
   const trimmed = value.trim();
@@ -141,10 +141,14 @@ export function associateEnrichmentEntity(
 
 /**
  * Auto-expand a collapsed box on a strong retrieval match (RETR-01 / §6.6): flip
- * boxes.state to "live" so the seq-walk renders it verbatim. The only mutation
- * auto-expand performs.
+ * boxes.state to "live" so the seq-walk renders it verbatim, and stamp `recalled_at_seq`
+ * to the current head so the recalled marker/badge shows for exactly this turn. The only
+ * mutation auto-expand performs. `sessionKey` is required to resolve the head seq.
  */
-export function autoExpandBox(options: OpenClawAgentDatabaseOptions & { boxId: string }): void {
+export function autoExpandBox(
+  options: OpenClawAgentDatabaseOptions & { boxId: string; sessionKey: string },
+): void {
   const boxId = assertNonBlank(options.boxId, "boxId");
-  setBoxState({ ...options, boxId, state: "live" });
+  const sessionKey = assertNonBlank(options.sessionKey, "sessionKey");
+  setBoxRecalledLive({ ...options, boxId, sessionKey });
 }

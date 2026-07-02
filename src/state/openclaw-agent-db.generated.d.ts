@@ -27,6 +27,7 @@ export interface Boxes {
   importance: number | null;
   label: string | null;
   last_active_seq: number | null;
+  recalled_at_seq: number | null;
   session_key: string;
   state: Generated<string>;
   summary: string | null;

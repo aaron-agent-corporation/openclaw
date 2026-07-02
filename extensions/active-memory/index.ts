@@ -17,10 +17,7 @@ import {
 } from "openclaw/plugin-sdk/agent-runtime";
 import type { OpenClawConfig } from "openclaw/plugin-sdk/config-contracts";
 import { readAssociativeContext } from "openclaw/plugin-sdk/memory-core-host-associative";
-import {
-  applyRetrievalAutoExpand,
-  injectedThisTurnBoxIds,
-} from "openclaw/plugin-sdk/memory-core-host-associative-write";
+import { applyRetrievalAutoExpand } from "openclaw/plugin-sdk/memory-core-host-associative-write";
 import { closeActiveMemorySearchManager } from "openclaw/plugin-sdk/memory-host-search";
 import {
   asDateTimestampMs,
@@ -3713,7 +3710,6 @@ export default definePluginEntry({
                   query,
                   readAssociativeContext,
                   applyRetrievalAutoExpand,
-                  injectedThisTurnBoxIds,
                   logDecision: (log) => {
                     if (invocationConfig.logging) {
                       api.logger.debug?.(

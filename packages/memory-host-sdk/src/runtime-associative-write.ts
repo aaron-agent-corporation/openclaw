@@ -15,8 +15,6 @@ export {
   type MemoryTagEdgeRow,
   applyRetrievalAutoExpand,
   resolveRetrievalAutoExpand,
-  injectedThisTurnBoxIds,
-  clearInjectedThisTurn,
   ACCORDION_STRONG_MATCH_CUTOFF,
   type RetrievalAutoExpandDecision,
   type RetrievalAutoExpandLog,

@@ -1,5 +1,5 @@
-// 05-04 Task 2: accordion-aware queryMode. On a strong match the mode escalates to
-// auto-expand (calls the write-seam auto-expand, marks injectedThisTurn) and logs the decision;
+// 05-04 Task 2: accordion-aware queryMode. On a strong match the mode escalates to auto-expand
+// (calls the write-seam auto-expand, which durably stamps recalled_at_seq) and logs the decision;
 // a weak match does neither; there is NO silent fallback to a weaker query.
 import { describe, expect, it, vi } from "vitest";
 import {
@@ -34,11 +34,9 @@ function seams(expanded: boolean, score: number) {
     suppressed: false,
   };
   const applyRetrievalAutoExpand = vi.fn(() => ({ decision, log: decision }));
-  const injectedThisTurnBoxIds = vi.fn(() => (expanded ? ["b1"] : []));
   return {
     readAssociativeContext: vi.fn(() => context),
     applyRetrievalAutoExpand,
-    injectedThisTurnBoxIds,
     logDecision: vi.fn(),
   };
 }
@@ -67,7 +65,7 @@ describe("accordion-aware queryMode", () => {
     );
   });
 
-  it("does not expand or mark injectedThisTurn on a weak match", () => {
+  it("does not expand on a weak match", () => {
     const s = seams(false, 0.2);
     const out = runAccordionAwareAutoExpand({
       agentId: "a",

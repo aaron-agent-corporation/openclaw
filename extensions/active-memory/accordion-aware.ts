@@ -4,8 +4,8 @@
  * runs the conservative strong-match retrieval auto-expand: it reads the associative context and
  * asks the core write seam to auto-expand the best-matching COLLAPSED box when (and only when)
  * the match is strong. On a strong match the box is flipped to live (the current turn renders it
- * verbatim — no one-turn lag) and marked injectedThisTurn (drives the recalled marker, Task 3);
- * every decision is logged with its score (§13).
+ * verbatim — no one-turn lag) and the write path durably stamps recalled_at_seq (drives the
+ * recalled marker); every decision is logged with its score (§13).
  *
  * NO SILENT FALLBACK (§9): if the accordion-aware evaluation finds nothing strong, the mode does
  * NOT re-run a weaker `message`/`recent` retrieval to force an injection — it simply reports no
@@ -33,7 +33,6 @@ export type AccordionAwareSeams = {
     query: string;
     context: AssociativeContext;
   }) => { decision: RetrievalAutoExpandLog; log: RetrievalAutoExpandLog };
-  injectedThisTurnBoxIds: (scope: { agentId: string; sessionKey: string }) => string[];
   logDecision: (log: RetrievalAutoExpandLog) => void;
 };
 
@@ -62,7 +61,9 @@ export function runAccordionAwareAutoExpand(
     context,
   });
   params.logDecision(log);
-  const expandedBoxIds = log.expanded ? params.injectedThisTurnBoxIds(scope) : [];
+  // The expanded box id comes straight from the decision the write seam already returned — no
+  // separate render-state lookup (the durable recalled_at_seq stamp drives the marker instead).
+  const expandedBoxIds = log.expanded && log.boxId != null ? [log.boxId] : [];
   return {
     expanded: log.expanded,
     expandedBoxIds,
