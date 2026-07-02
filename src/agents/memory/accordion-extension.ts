@@ -52,29 +52,22 @@ function buildRecalledMarkers(boxes: readonly BoxRow[], headSeq: number | null):
 }
 
 /**
- * Prebuilt seq -> owning box id lookup over a session's spans. Spans are contiguous,
- * non-overlapping seq ranges owned by at most one box, so sorting once by start_seq lets each
- * message resolve its box by binary search — O(log spans) instead of a linear spans.find() inside
- * the per-message loop (O(messages × spans) on the hot context path).
+ * Prebuilt seq -> owning box id lookup over a session's spans. Built in one pass with
+ * first-span-in-row-order wins, exactly matching the pre-refactor linear `spans.find()` semantics:
+ * `upsertSpan` never prunes, so stale/duplicate spans can overlap, and the first covering span (row
+ * order) must win. One O(sum span lengths ≈ turns) build + O(1) lookup avoids the O(messages ×
+ * spans) rescan the per-message linear find caused on the hot context path.
  */
 function buildSeqToBoxId(spans: readonly SpanRow[]): (seq: number) => string | null {
-  const sorted = [...spans].sort((a, b) => a.start_seq - b.start_seq);
-  return (seq: number): string | null => {
-    let lo = 0;
-    let hi = sorted.length - 1;
-    while (lo <= hi) {
-      const mid = (lo + hi) >> 1;
-      const span = sorted[mid];
-      if (seq < span.start_seq) {
-        hi = mid - 1;
-      } else if (seq > span.end_seq) {
-        lo = mid + 1;
-      } else {
-        return span.box_id;
+  const boxBySeq = new Map<number, string | null>();
+  for (const span of spans) {
+    for (let seq = span.start_seq; seq <= span.end_seq; seq++) {
+      if (!boxBySeq.has(seq)) {
+        boxBySeq.set(seq, span.box_id);
       }
     }
-    return null;
-  };
+  }
+  return (seq: number): string | null => boxBySeq.get(seq) ?? null;
 }
 
 /**
