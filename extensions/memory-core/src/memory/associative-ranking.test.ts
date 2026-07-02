@@ -51,6 +51,23 @@ describe("augmentMemoryResultsWithAssociativeContext", () => {
     expect(out.map((r) => r.id)).toEqual(["a", "b"]);
   });
 
+  it("returns each matched hit carrying its boosted score (survives a later score read)", () => {
+    const out = augmentMemoryResultsWithAssociativeContext({
+      results,
+      context: context([{ entities: ["NEBULA-73"] }]),
+      boost: 0.5,
+      entityBoost: 0.5,
+    });
+    // The matched hit's score is boosted on the returned object, not just reordered: 0.4*1.5=0.6.
+    const boosted = out.find((r) => r.id === "b");
+    const untouched = out.find((r) => r.id === "a");
+    expect(boosted?.score).toBeCloseTo(0.6, 10);
+    expect(untouched?.score).toBe(0.5);
+    // A downstream re-sort by the returned score keeps the associative ordering.
+    const resorted = [...out].sort((x, y) => y.score - x.score);
+    expect(resorted.map((r) => r.id)).toEqual(["b", "a"]);
+  });
+
   it("does not mutate the input results", () => {
     const snapshot = results.map((r) => ({ ...r }));
     augmentMemoryResultsWithAssociativeContext({

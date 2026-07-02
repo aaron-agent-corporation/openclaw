@@ -63,10 +63,12 @@ function boxKeys(context: AssociativeContext): BoxKey[] {
 }
 
 /**
- * Return a re-ranked copy of `results`: each hit whose snippet mentions a recall key is boosted
- * (exact entity keys stronger than coarse topic/tag keys), with the matched box's importance as
- * a near-tie breaker, then the list is re-sorted by score (stable for ties). Inputs are not
- * mutated. When there are no recall keys the original ordering is returned as-is.
+ * Return a re-ranked copy of `results`: each matched hit is returned as a NEW object carrying its
+ * BOOSTED score (exact entity keys stronger than coarse topic/tag keys), with the matched box's
+ * importance as a near-tie breaker, then the list is re-sorted by score (stable for ties). The
+ * boosted score must travel on the returned hit — not just its position — so a downstream score
+ * reader or re-sorter cannot silently undo the associative re-rank. Inputs are not mutated. When
+ * there are no recall keys the original ordering is returned as-is.
  */
 export function augmentMemoryResultsWithAssociativeContext<
   T extends { snippet: string; score: number },
@@ -102,11 +104,9 @@ export function augmentMemoryResultsWithAssociativeContext<
     const boost = matchedEntity ? entityBoost : keyBoost;
     // Importance breaks near-ties without dominating relevance.
     const importanceLift = 1 + IMPORTANCE_TIEBREAK_WEIGHT * (matched.importance ?? 0);
-    return {
-      result,
-      index,
-      score: result.score * (1 + boost) * importanceLift,
-    };
+    const boostedScore = result.score * (1 + boost) * importanceLift;
+    // Carry the boosted score on a new hit object so the re-rank survives any later score read.
+    return { result: { ...result, score: boostedScore }, index, score: boostedScore };
   });
   // Stable sort: higher score first, original order breaks exact ties.
   scored.sort((a, b) => b.score - a.score || a.index - b.index);
