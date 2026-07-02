@@ -33,6 +33,15 @@ import {
  * its retrieval auto-expand stamped the current head seq (boxes.recalled_at_seq === head): the
  * signal self-clears once the head advances, so a still-live box never re-emits the marker on a
  * later turn. Manually-expanded or already-live boxes carry a stale/absent stamp and get no marker.
+ *
+ * KNOWN LIMITATIONS (D-02, deferred to Phase 6 Semantic Topic Retrieval, cm-unified-session-qnf):
+ * the head-seq-equality signal is imperfect — (a) the UI badge (accordion-ui.readAccordionView) is
+ * read AFTER agent_end has advanced the head, so it rarely lights; (b) a turn that captures no new
+ * turn (dedup/noise-only/capture-failure) leaves the head static, so this marker can re-fire; (c) a
+ * backfilled session with no captured turns stamps a null head, suppressing the marker. Phase 6
+ * reworks the recall path and will replace this with a turn-scoped signal that both consumers and
+ * the collapse decision share. The self-collapse and overlap fixes (05-08) are NOT part of this
+ * deferral — those are corrected.
  */
 function buildRecalledMarkers(boxes: readonly BoxRow[], headSeq: number | null): AgentMessage[] {
   if (headSeq == null) {
