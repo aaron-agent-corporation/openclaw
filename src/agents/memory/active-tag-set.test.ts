@@ -68,6 +68,23 @@ describe("active-tag-set auto-collapse (jaccard-distance variant)", () => {
     expect(collapsed).toEqual(["box-voice"]); // voice fell out of the active set
   });
 
+  it("does not collapse a box retrieval-recalled THIS turn (recalled_at_seq === head)", () => {
+    const { turns, spans } = topicSwitch(2, COLLAPSE_DWELL_TURNS + 1);
+    const head = turns[turns.length - 1].seq;
+    // box-voice is stale (the case above collapses it) but retrieval just auto-expanded it this
+    // turn; recalled_at_seq === head must protect it from same-turn re-collapse (RETR-01).
+    const boxes = [box("box-voice", { recalled_at_seq: head }), box("box-code")];
+    expect(decideAutoCollapse({ turns, spans, boxes }, JACCARD_PARAMS)).toEqual([]);
+  });
+
+  it("collapses a box whose recalled_at_seq is a PRIOR head (recall protection self-clears)", () => {
+    const { turns, spans } = topicSwitch(2, COLLAPSE_DWELL_TURNS + 1);
+    const head = turns[turns.length - 1].seq;
+    // Recalled on an earlier turn: recalled_at_seq < head → protection lapsed, collapse resumes.
+    const boxes = [box("box-voice", { recalled_at_seq: head - 1 }), box("box-code")];
+    expect(decideAutoCollapse({ turns, spans, boxes }, JACCARD_PARAMS)).toEqual(["box-voice"]);
+  });
+
   it("does not collapse before the anti-thrash dwell elapses", () => {
     // Only a couple of coding turns: voice is stale but still within the dwell window.
     const { turns, spans, boxes } = topicSwitch(2, COLLAPSE_DWELL_TURNS - 1);
