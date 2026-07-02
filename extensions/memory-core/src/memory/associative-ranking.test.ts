@@ -64,7 +64,7 @@ describe("augmentMemoryResultsWithAssociativeContext", () => {
     expect(boosted?.score).toBeCloseTo(0.6, 10);
     expect(untouched?.score).toBe(0.5);
     // A downstream re-sort by the returned score keeps the associative ordering.
-    const resorted = [...out].sort((x, y) => y.score - x.score);
+    const resorted = out.toSorted((x, y) => y.score - x.score);
     expect(resorted.map((r) => r.id)).toEqual(["b", "a"]);
   });
 

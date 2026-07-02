@@ -39,7 +39,7 @@ describe("buildAssociativeIndexRecords", () => {
       ]),
     );
     // box rollup + entity summary + tag rollup are all retrievable.
-    const kinds = records.map((r) => r.kind).sort();
+    const kinds = records.map((r) => r.kind).toSorted();
     expect(kinds).toEqual(["box", "entity", "tag"]);
     const box = records.find((r) => r.kind === "box");
     expect(box?.importance).toBe(0.8);
@@ -138,7 +138,7 @@ describe("augmentMemoryResultsWithAssociativeContext — importance + entity-key
 describe("entityKeysFromContext", () => {
   it("collects distinct lowercased entity keys", () => {
     expect(
-      entityKeysFromContext(context([{ entities: ["Fidel", "fidel", "Aurora"] }])).sort(),
+      entityKeysFromContext(context([{ entities: ["Fidel", "fidel", "Aurora"] }])).toSorted(),
     ).toEqual(["aurora", "fidel"]);
   });
 });
