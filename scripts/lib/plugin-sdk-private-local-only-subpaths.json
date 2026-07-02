@@ -8,6 +8,7 @@
   "plugin-test-contracts",
   "plugin-state-test-runtime",
   "plugin-test-runtime",
+  "memory-core-host-store-testing",
   "provider-http-test-mocks",
   "provider-test-contracts",
   "qa-channel",
