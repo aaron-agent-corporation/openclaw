@@ -62,6 +62,9 @@
       "openclaw/plugin-sdk/plugin-state-test-runtime": [
         "../packages/plugin-sdk/dist/src/plugin-sdk/plugin-state-test-runtime.d.ts"
       ],
+      "openclaw/plugin-sdk/memory-core-host-store-testing": [
+        "../packages/plugin-sdk/dist/src/plugin-sdk/memory-core-host-store-testing.d.ts"
+      ],
       "openclaw/plugin-sdk/channel-contract-testing": [
         "../packages/plugin-sdk/dist/src/plugin-sdk/channel-contract-testing.d.ts"
       ],
