@@ -368,6 +368,8 @@ usage endpoint failed or returned no usable usage data.
     | `plugin-sdk/memory-core-host-engine-storage` | Memory host storage engine exports |
     | `plugin-sdk/memory-core-host-multimodal` | Memory host multimodal helpers |
     | `plugin-sdk/memory-core-host-associative` | Read-only associative memory context (tag/entity co-occurrence) for boosting memory search ranking |
+    | `plugin-sdk/memory-core-host-associative-write` | Core-validated write seam for the dreaming enrichment pass (box importance/rollups, tag DAG edges, associations, auto-expand) |
+    | `plugin-sdk/memory-core-host-store-testing` | Private local-only test seam for the per-agent turns/boxes store; excluded from the published package |
     | `plugin-sdk/memory-core-host-query` | Memory host query helpers |
     | `plugin-sdk/memory-core-host-secret` | Memory host secret helpers |
     | `plugin-sdk/memory-core-host-events` | Deprecated compatibility alias; use `plugin-sdk/memory-host-events` |
