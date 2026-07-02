@@ -151,6 +151,11 @@ export function runReplayEval(params: {
       } else {
         // A still-needed topic was not surfaced — the worst outcome (recall-safety-first).
         counts.recallFailures += 1;
+        if (expandedBoxId != null) {
+          // The wrong box was surfaced instead: that spurious surface is ALSO a precision
+          // failure, or a systematic wrong-box expansion would report precision 1.0.
+          counts.precisionFailures += 1;
+        }
       }
     } else if (expandedBoxId != null) {
       // Surfaced a box the reference says was not needed — a spurious surface (precision failure).
