@@ -3717,7 +3717,7 @@ export default definePluginEntry({
                   logDecision: (log) => {
                     if (invocationConfig.logging) {
                       api.logger.debug?.(
-                        `active-memory: accordion-aware decision box=${log.boxId ?? "none"} score=${log.score.toFixed(3)} cutoff=${log.cutoff.toFixed(3)} expanded=${String(log.expanded)}`,
+                        `active-memory: accordion-aware decision box=${log.boxId ?? "none"} score=${log.score.toFixed(3)} cutoff=${log.cutoff.toFixed(3)} expanded=${String(log.expanded)} indexRef=${log.indexRef ?? "none"} suppressed=${String(log.suppressed)}`,
                       );
                     }
                   },

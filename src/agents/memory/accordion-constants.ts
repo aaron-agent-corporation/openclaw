@@ -97,3 +97,21 @@ export const ENRICHMENT_ROLLUP_MAX_CHARS = 600;
  * replay precision/recall harness (05-05) retunes this against held-out data.
  */
 export const ACCORDION_STRONG_MATCH_CUTOFF = 0.6;
+
+/**
+ * TUNABLE (Phase 5 — 05-06; §7 low-salience suppression). Normalized §7 importance strictly
+ * below this floor marks a box as low-salience: the dreaming pass writes a short deterministic
+ * `suppression_rollup` note for it, and retrieval requires a HIGHER effective cutoff before a
+ * LEXICAL-only match auto-expands it (an exact-entity mention is never suppressed —
+ * recall-safety-first, D-07/D-09). Deliberately low so only genuinely faint boxes are damped;
+ * TUNE-02's replay harness retunes it against held-out data.
+ */
+export const ENRICHMENT_LOW_SALIENCE_FLOOR = 0.35;
+
+/**
+ * TUNABLE (Phase 5 — 05-06; §6.4/§9 recall-safe suppression). Added to the strong-match cutoff
+ * for a LEXICAL-only match against a low-salience (suppressed) collapsed box, so a faint topic
+ * needs near-complete lexical coverage to auto-expand. Never applied to an exact-entity match:
+ * a precise reference to a suppressed topic must still surface (recall-safety-first, D-07/D-09).
+ */
+export const ACCORDION_SUPPRESSION_CUTOFF_BUMP = 0.2;

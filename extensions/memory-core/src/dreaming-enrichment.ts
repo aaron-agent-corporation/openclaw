@@ -5,7 +5,8 @@
  * dreaming stack never touched it. Per box it writes, THROUGH the 05-01 write seam:
  *   - a real multi-turn rollup summary (superseding the segment-spans first-line truncation),
  *   - a normalized additive importance score (§7 formula, inputs stored for TUNE-02),
- *   - a `summary_embedding_ref` marker,
+ *   - a `summary_embedding_ref` marker (consumed by the 05-06 associative index / auto-expand log),
+ *   - a `suppression_rollup` low-salience note for boxes below the importance floor (05-06),
  * and derives DAG parent edges from tag co-occurrence (broader tag → narrower tag), linking
  * them via the cycle-guarded `linkTagParent`.
  *
@@ -19,6 +20,7 @@
  */
 import {
   computeImportance,
+  ENRICHMENT_LOW_SALIENCE_FLOOR,
   ENRICHMENT_MAX_BOXES_PER_NIGHT,
   ENRICHMENT_MAX_TAG_EDGES_PER_NIGHT,
   ENRICHMENT_MIN_COOCCURRENCE_WEIGHT,
@@ -80,9 +82,11 @@ function buildRollupSummary(box: BoxRollupInputs): string {
 }
 
 /**
- * Content-derived, stable ref for the rollup summary. A real value populates the previously
- * dead `boxes.summary_embedding_ref` column; downstream retrieval (05-04) indexes the rollup
- * against this ref. Deterministic so idempotent re-runs produce the identical ref.
+ * Content-derived, stable ref for the rollup summary. Populates `boxes.summary_embedding_ref`,
+ * whose real consumer (05-06) is the associative index: `buildAssociativeIndexRecords` carries
+ * it as each record's `indexRef`, and the retrieval auto-expand decision log records the winning
+ * box's `indexRef` — so a decision can be correlated to the exact rollup version it matched.
+ * Deterministic so idempotent re-runs produce the identical ref.
  */
 function summaryEmbeddingRef(boxId: string, summary: string): string {
   let hash = 0;
@@ -90,6 +94,22 @@ function summaryEmbeddingRef(boxId: string, summary: string): string {
     hash = (hash * 31 + summary.charCodeAt(index)) | 0;
   }
   return `rollup:${boxId}:${(hash >>> 0).toString(16)}`;
+}
+
+/**
+ * Short deterministic low-salience note for a box whose normalized importance falls strictly
+ * below `ENRICHMENT_LOW_SALIENCE_FLOOR`, or null for a salient box. Populates the previously
+ * dead `boxes.suppression_rollup` column; its consumer (05-06) is the retrieval auto-expand
+ * scorer, which requires a higher effective cutoff for a suppressed box on a LEXICAL-only match
+ * (an exact-entity mention is never suppressed — recall-safety-first, D-07/D-09). Bounded and
+ * deterministic so idempotent re-runs write the identical note.
+ */
+function suppressionRollupNote(box: BoxRollupInputs, importance: number): string | null {
+  if (importance >= ENRICHMENT_LOW_SALIENCE_FLOOR) {
+    return null;
+  }
+  const topic = box.topic?.trim();
+  return `suppressed:${topic && topic.length > 0 ? topic : box.boxId}:low-salience`;
 }
 
 /**
@@ -192,6 +212,7 @@ export async function runAssociativeEnrichment(
     inputs: { recurrenceCount: number; turnDepth: number; effortSignal: number };
     summaryChars: number;
     linkedParents: number;
+    suppressed: boolean;
   }> = [];
 
   let boxesEnriched = 0;
@@ -208,6 +229,7 @@ export async function runAssociativeEnrichment(
     });
     const summary = buildRollupSummary(box);
     const embeddingRef = summaryEmbeddingRef(box.boxId, summary);
+    const suppression = suppressionRollupNote(box, score);
     writeBoxEnrichment({
       ...scope,
       box: {
@@ -216,6 +238,7 @@ export async function runAssociativeEnrichment(
         importance: score,
         summary,
         summaryEmbeddingRef: embeddingRef,
+        suppressionRollup: suppression,
       },
     });
 
@@ -254,6 +277,7 @@ export async function runAssociativeEnrichment(
       inputs,
       summaryChars: summary.length,
       linkedParents: linkedForBox,
+      suppressed: suppression != null,
     });
   }
 
@@ -273,6 +297,7 @@ export async function runAssociativeEnrichment(
           inputs: event.inputs,
           summaryChars: event.summaryChars,
           linkedParents: event.linkedParents,
+          suppressed: event.suppressed,
         });
       } catch (err) {
         options.logger?.warn(

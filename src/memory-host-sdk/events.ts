@@ -91,6 +91,11 @@ export type MemoryHostEnrichBoxEvent = {
   summaryChars: number;
   /** DAG parent edges linked for this box's tags in this pass. */
   linkedParents: number;
+  /**
+   * True when the box fell below the low-salience floor and a `suppression_rollup` note was
+   * written (05-06). Optional so older log lines without the field still parse.
+   */
+  suppressed?: boolean;
 };
 
 /**

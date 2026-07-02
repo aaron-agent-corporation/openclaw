@@ -40,6 +40,7 @@ export {
   type ImportanceResult,
 } from "../../../../src/agents/memory/importance-score.js";
 export {
+  ENRICHMENT_LOW_SALIENCE_FLOOR,
   ENRICHMENT_MAX_BOXES_PER_NIGHT,
   ENRICHMENT_MAX_TAG_EDGES_PER_NIGHT,
   ENRICHMENT_MIN_COOCCURRENCE_WEIGHT,

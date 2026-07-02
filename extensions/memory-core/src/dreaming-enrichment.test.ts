@@ -128,6 +128,68 @@ describe("runAssociativeEnrichment", () => {
     }
   });
 
+  it("writes a suppression_rollup note for a low-salience box and none for a salient box", async () => {
+    const stateDir = tempStateDir();
+    const scope = seedScope(stateDir);
+    const env = { OPENCLAW_STATE_DIR: stateDir } as NodeJS.ProcessEnv;
+    // Salient box: a multi-turn, effortful span → importance above the low-salience floor.
+    appendTurns({
+      ...scope,
+      sessionKey: SESSION_KEY,
+      turns: [
+        turn("1", "user", "Let us plan the database migration rollout and its schedule in detail"),
+        turn("2", "assistant", "Here is a three-phase migration plan with rollback and checks"),
+        turn("3", "user", "Walk me through the rollback verification once more please"),
+        turn(
+          "4",
+          "assistant",
+          "Rollback verification runs the migration in reverse with checksums",
+        ),
+      ],
+    });
+    // Faint box: one short user aside → importance below the floor → suppression note expected.
+    appendTurns({
+      ...scope,
+      sessionKey: SESSION_KEY,
+      turns: [turn("5", "user", "just a small aside about nothing")],
+    });
+    upsertBox({
+      ...scope,
+      box: { boxId: "box-salient", sessionKey: SESSION_KEY, label: "migration" },
+    });
+    upsertBox({ ...scope, box: { boxId: "box-faint", sessionKey: SESSION_KEY, label: "aside" } });
+    upsertSpan({
+      ...scope,
+      span: {
+        spanId: "sp-salient",
+        sessionKey: SESSION_KEY,
+        startSeq: 1,
+        endSeq: 4,
+        topic: "migration",
+        boxId: "box-salient",
+      },
+    });
+    upsertSpan({
+      ...scope,
+      span: {
+        spanId: "sp-faint",
+        sessionKey: SESSION_KEY,
+        startSeq: 5,
+        endSeq: 5,
+        topic: "aside",
+        boxId: "box-faint",
+      },
+    });
+
+    await runAssociativeEnrichment({ agentId: AGENT_ID, sessionKey: SESSION_KEY, env });
+    const boxes = listBoxes({ agentId: AGENT_ID, sessionKey: SESSION_KEY, env });
+    const faint = boxes.find((b) => b.box_id === "box-faint");
+    const salient = boxes.find((b) => b.box_id === "box-salient");
+    // Producer→consumer for the previously-dead column: low-salience box carries the note.
+    expect(faint?.suppression_rollup).toBe("suppressed:aside:low-salience");
+    expect(salient?.suppression_rollup).toBeNull();
+  });
+
   it("builds DAG parent edges via the write seam at runtime", async () => {
     const stateDir = seededStore();
     const env = { OPENCLAW_STATE_DIR: stateDir } as NodeJS.ProcessEnv;

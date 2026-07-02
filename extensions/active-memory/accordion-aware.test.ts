@@ -18,15 +18,22 @@ const context = {
       tags: [],
       entities: ["Fidel"],
       importance: 0.5,
+      summaryEmbeddingRef: null,
+      suppressionRollup: null,
     },
   ],
 };
 
 function seams(expanded: boolean, score: number) {
-  const applyRetrievalAutoExpand = vi.fn(() => ({
-    decision: { boxId: expanded ? "b1" : null, score, cutoff: 0.6, expanded },
-    log: { boxId: expanded ? "b1" : null, score, cutoff: 0.6, expanded },
-  }));
+  const decision = {
+    boxId: expanded ? "b1" : null,
+    score,
+    cutoff: 0.6,
+    expanded,
+    indexRef: expanded ? "rollup:b1:abc" : null,
+    suppressed: false,
+  };
+  const applyRetrievalAutoExpand = vi.fn(() => ({ decision, log: decision }));
   const injectedThisTurnBoxIds = vi.fn(() => (expanded ? ["b1"] : []));
   return {
     readAssociativeContext: vi.fn(() => context),
