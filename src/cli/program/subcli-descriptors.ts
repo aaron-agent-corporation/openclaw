@@ -129,7 +129,7 @@ const subCliCommandCatalog = defineCommandDescriptorCatalog([
   },
   {
     name: "memory",
-    description: "Search, inspect, reindex, and backfill memory",
+    description: "Search, inspect, reindex, backfill, and evaluate memory",
     hasSubcommands: true,
   },
   {

@@ -11,8 +11,8 @@
 import { withEnv } from "../agents/memory/backfill-cursor.js";
 import { runBackfillOrganize } from "../agents/memory/backfill-organize.js";
 import { runBackfillSeed } from "../agents/memory/backfill-seed.js";
-import { isValidAgentId, normalizeAgentId } from "../routing/session-key.js";
 import { type RuntimeEnv, writeRuntimeJson } from "../runtime.js";
+import { resolveCommandAgentId } from "./memory-shared.js";
 
 export type MemoryBackfillCommandOptions = {
   agent?: string;
@@ -22,28 +22,6 @@ export type MemoryBackfillCommandOptions = {
   env?: NodeJS.ProcessEnv;
   transcriptsDir?: string;
 };
-
-/**
- * Validate the operator-supplied agent id with the canonical `isValidAgentId` (VALID_ID_RE),
- * then return its normalized form. Rejecting up front with the same predicate the rest of the
- * system uses means a malformed id (leading `_`/`-`, path traversal like `../other`, embedded
- * dots) never reaches path/DB resolution (V5 — no traversal before path resolution); we do NOT
- * let `normalizeAgentId` silently coerce a bad id into a different agent's data.
- */
-function resolveCommandAgentId(raw: string | undefined, runtime: RuntimeEnv): string | null {
-  const trimmed = raw?.trim();
-  if (!trimmed) {
-    runtime.error("--agent <id> is required.");
-    runtime.exit(1);
-    return null;
-  }
-  if (!isValidAgentId(trimmed)) {
-    runtime.error(`Invalid --agent id: ${trimmed}`);
-    runtime.exit(1);
-    return null;
-  }
-  return normalizeAgentId(trimmed);
-}
 
 export async function runMemoryBackfillCommand(
   options: MemoryBackfillCommandOptions,

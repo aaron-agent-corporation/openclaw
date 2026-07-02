@@ -14,7 +14,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { resolveSessionTranscriptsDirForAgent } from "../../config/sessions/paths.js";
-import { normalizeAgentId } from "../../routing/session-key.js";
+import { buildAgentMainSessionKey, normalizeAgentId } from "../../routing/session-key.js";
 import type { AgentMessage } from "../runtime/index.js";
 import { loadEntriesFromFile } from "../sessions/index.js";
 import { readSeedCursor, withEnv, writeSeedCursor } from "./backfill-cursor.js";
@@ -75,7 +75,7 @@ export function runBackfillSeed(options: {
   transcriptsDir?: string;
 }): BackfillSeedResult {
   const agentId = normalizeAgentId(options.agentId);
-  const sessionKey = `agent:${agentId}:main`;
+  const sessionKey = buildAgentMainSessionKey({ agentId });
   const env = options.env;
   const transcriptsDir =
     options.transcriptsDir ?? resolveSessionTranscriptsDirForAgent(agentId, env);
