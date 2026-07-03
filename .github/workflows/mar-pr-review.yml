@@ -1,0 +1,65 @@
+name: MAR PR Review
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize, ready_for_review]
+  workflow_dispatch:
+    inputs:
+      pr:
+        description: Pull request number or URL to review
+        required: true
+        type: string
+      post:
+        description: Post the unified review back to GitHub
+        required: true
+        default: true
+        type: boolean
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: write
+  statuses: write
+
+concurrency:
+  group: mar-pr-review-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: true
+
+jobs:
+  review:
+    name: Multi-agent PR review
+    runs-on: self-hosted
+    if: ${{ github.event_name != 'pull_request' || (!github.event.pull_request.draft && github.event.pull_request.head.repo.full_name == github.repository) }}
+    steps:
+      - name: Resolve PR review mode
+        shell: bash
+        env:
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          DISPATCH_PR_SELECTOR: ${{ inputs.pr }}
+          DISPATCH_POST: ${{ inputs.post }}
+        run: |
+          if [[ "$GITHUB_EVENT_NAME" == "pull_request" ]]; then
+            printf 'PR_SELECTOR=%s\n' "$PR_URL" >> "$GITHUB_ENV"
+            printf 'MAR_POST_REVIEW=true\n' >> "$GITHUB_ENV"
+          else
+            printf 'PR_SELECTOR=%s\n' "$DISPATCH_PR_SELECTOR" >> "$GITHUB_ENV"
+            printf 'MAR_POST_REVIEW=%s\n' "$DISPATCH_POST" >> "$GITHUB_ENV"
+          fi
+
+      - name: Run MAR review
+        uses: aaron-agent-corporation/multi-agent-review@main
+        with:
+          pr: ${{ env.PR_SELECTOR }}
+          post: ${{ env.MAR_POST_REVIEW }}
+          claude-oauth-token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          codex-access-token: ${{ secrets.CODEX_ACCESS_TOKEN }}
+          codex-api-key: ${{ secrets.CODEX_API_KEY }}
+          gemini-api-key: ${{ secrets.GEMINI_API_KEY }}
+          google-cloud-project: ${{ secrets.GOOGLE_CLOUD_PROJECT || vars.GOOGLE_CLOUD_PROJECT }}
+          xai-api-key: ${{ secrets.XAI_API_KEY }}
+          grok-api-key: ${{ secrets.GROK_API_KEY }}
+          notify-webhook-url: ${{ secrets.MAR_NOTIFY_WEBHOOK_URL }}
+          notify-webhook-token: ${{ secrets.MAR_NOTIFY_WEBHOOK_TOKEN }}
+          notify-kind: ${{ vars.MAR_NOTIFY_KIND || 'claude-code-channel' }}
+          notify-target: ${{ secrets.MAR_NOTIFY_TARGET || vars.MAR_NOTIFY_TARGET || 'default' }}
+          github-token: ${{ github.token }}
