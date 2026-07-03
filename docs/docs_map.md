@@ -1619,6 +1619,7 @@ Do not edit it by hand; run `pnpm docs:map:gen`.
   - H2: Examples
   - H2: Options
   - H2: Dreaming
+  - H2: Conversational memory maintenance
   - H2: Related
 
 ## cli/message.md

@@ -1391,6 +1391,7 @@ export const ru: TranslationMap = {
       collapse: "Свернуть",
       expandTopic: "Развернуть тему {topic}",
       collapseTopic: "Свернуть тему {topic}",
+      recalled: "вспомнено: {topic}",
     },
     composer: {
       placeholder: "Сообщение {name} (Enter для отправки)",

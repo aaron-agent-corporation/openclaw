@@ -1349,6 +1349,7 @@ export const th: TranslationMap = {
       collapse: "ยุบ",
       expandTopic: "ขยายหัวข้อ {topic}",
       collapseTopic: "ยุบหัวข้อ {topic}",
+      recalled: "เรียกคืนแล้ว: {topic}",
     },
     composer: {
       placeholder: "Message {name} (Enter to send)",

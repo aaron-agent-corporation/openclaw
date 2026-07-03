@@ -1367,6 +1367,7 @@ export const hi: TranslationMap = {
       collapse: "संक्षिप्त करें",
       expandTopic: "विषय {topic} को विस्तार करें",
       collapseTopic: "विषय {topic} को संक्षिप्त करें",
+      recalled: "वापस बुलाया गया: {topic}",
     },
     composer: {
       placeholder: "{name} को संदेश भेजें (भेजने के लिए Enter)",

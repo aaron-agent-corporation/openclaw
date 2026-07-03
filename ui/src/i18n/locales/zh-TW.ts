@@ -1346,6 +1346,7 @@ export const zh_TW: TranslationMap = {
       collapse: "收合",
       expandTopic: "展開主題 {topic}",
       collapseTopic: "收合主題 {topic}",
+      recalled: "已回想：{topic}",
     },
     composer: {
       placeholder: "Message {name} (Enter to send)",

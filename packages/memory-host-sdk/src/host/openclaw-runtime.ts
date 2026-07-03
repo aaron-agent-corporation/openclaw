@@ -27,15 +27,61 @@ export {
 // Read-only associative context (topic boxes + linked tags/entities) for search ranking.
 export {
   readAssociativeContext,
+  readBoxRollupInputs,
   type AssociativeBoxContext,
   type AssociativeContext,
+  type BoxRollupInputs,
 } from "../../../../src/agents/memory/associative-context.js";
+// §7 importance scorer + the single tunable enrichment-cap surface (TUNE-02). Exposed on the
+// read seam so the memory-core dreaming pass scores and bounds itself without importing core.
+export {
+  computeImportance,
+  type ImportanceInputs,
+  type ImportanceResult,
+} from "../../../../src/agents/memory/importance-score.js";
+export {
+  ENRICHMENT_LOW_SALIENCE_FLOOR,
+  ENRICHMENT_MAX_BOXES_PER_NIGHT,
+  ENRICHMENT_MAX_TAG_EDGES_PER_NIGHT,
+  ENRICHMENT_MIN_COOCCURRENCE_WEIGHT,
+  ENRICHMENT_ROLLUP_MAX_CHARS,
+  ENRICHMENT_ROLLUP_MAX_TURNS,
+} from "../../../../src/agents/memory/accordion-constants.js";
 export {
   readTagCooccurrence,
   type TagGraphNeighbor,
   type TagGraphTargetRef,
   type TagGraphTraversal,
 } from "../../../../src/agents/memory/tag-graph.js";
+
+// Associative WRITE surface (05-01): the dreaming enrichment pass persists box
+// importance / rollups / summary_embedding_ref / DAG edges / associations / auto-expand.
+// These writes cross the plugin->core boundary; core validates every one and keeps
+// sole ownership of the turns/boxes/associative schema.
+export {
+  associateEnrichmentEntity,
+  associateEnrichmentTag,
+  autoExpandBox,
+  linkTagParent,
+  listEnrichmentTagEdges,
+  upsertEnrichmentEntity,
+  upsertEnrichmentTag,
+  writeBoxEnrichment,
+  type BoxEnrichment,
+} from "../../../../src/agents/memory/associative-enrichment-writes.js";
+export type { MemoryTagEdgeRow } from "../../../../src/agents/memory/associative-store.js";
+
+// Accordion-aware retrieval auto-expand (05-04 / RETR-01): the accordion-aware query mode runs
+// the strong-match decision and, on a strong match, flips a collapsed box to live via the write
+// path above so the current turn renders it verbatim. The injected-this-turn registry drives the
+// recalled marker. Conservative, recall-safety-first, decision-logged — no silent fallback.
+export {
+  applyRetrievalAutoExpand,
+  resolveRetrievalAutoExpand,
+  type RetrievalAutoExpandDecision,
+  type RetrievalAutoExpandLog,
+} from "../../../../src/agents/memory/accordion-auto-expand.js";
+export { ACCORDION_STRONG_MATCH_CUTOFF } from "../../../../src/agents/memory/accordion-constants.js";
 
 // Session and reply helpers.
 export { isHeartbeatUserMessage } from "../../../../src/auto-reply/heartbeat-filter.js";

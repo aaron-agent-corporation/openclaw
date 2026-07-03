@@ -133,6 +133,24 @@ export function listSpans(options: SessionScopedOptions): SpanRow[] {
   ).rows;
 }
 
+/**
+ * The current head seq for a session (max turns.seq), or null when the session has no turns.
+ * Shared by consumers that gate transient render state (recalled marker/badge) on the head, so
+ * they all compute "this turn" the same way as the recall write path.
+ */
+export function readHeadSeq(options: SessionScopedOptions): number | null {
+  const database = openOpenClawAgentDatabase(options);
+  const db = getNodeSqliteKysely<TurnsDatabase>(database.db);
+  const head = executeSqliteQueryTakeFirstSync(
+    database.db,
+    db
+      .selectFrom("turns")
+      .select((eb) => eb.fn.max("seq").as("max_seq"))
+      .where("session_key", "=", options.sessionKey),
+  );
+  return head?.max_seq == null ? null : head.max_seq;
+}
+
 /** List boxes for a session. */
 export function listBoxes(options: SessionScopedOptions): BoxRow[] {
   const database = openOpenClawAgentDatabase(options);
@@ -195,6 +213,7 @@ export function upsertBox(
       label?: string | null;
       state?: BoxState;
       summary?: string | null;
+      summaryEmbeddingRef?: string | null;
       importance?: number | null;
       suppressionRollup?: string | null;
       lastActiveSeq?: number | null;
@@ -214,6 +233,7 @@ export function upsertBox(
           label: box.label ?? null,
           ...(box.state ? { state: box.state } : {}),
           summary: box.summary ?? null,
+          summary_embedding_ref: box.summaryEmbeddingRef ?? null,
           importance: box.importance ?? null,
           suppression_rollup: box.suppressionRollup ?? null,
           last_active_seq: box.lastActiveSeq ?? null,
@@ -223,6 +243,7 @@ export function upsertBox(
             label: box.label ?? null,
             ...(box.state ? { state: box.state } : {}),
             summary: box.summary ?? null,
+            summary_embedding_ref: box.summaryEmbeddingRef ?? null,
             importance: box.importance ?? null,
             suppression_rollup: box.suppressionRollup ?? null,
             last_active_seq: box.lastActiveSeq ?? null,
@@ -241,6 +262,34 @@ export function setBoxState(
     executeSqliteQuerySync(
       database.db,
       db.updateTable("boxes").set({ state: options.state }).where("box_id", "=", options.boxId),
+    );
+  }, options);
+}
+
+/**
+ * Flip a collapsed box to live for a retrieval auto-expand (RETR-01 / §6.6) and stamp
+ * `recalled_at_seq` to the current head seq in the same transaction. The recalled marker/badge
+ * shows iff a box is live AND recalled_at_seq equals the head, so stamping the head here makes
+ * the signal durable (no cross-hook global) and self-clearing (false once the head advances).
+ */
+export function setBoxRecalledLive(options: SessionScopedOptions & { boxId: string }): void {
+  runOpenClawAgentWriteTransaction((database) => {
+    const db = getNodeSqliteKysely<TurnsDatabase>(database.db);
+    const head = executeSqliteQueryTakeFirstSync(
+      database.db,
+      db
+        .selectFrom("turns")
+        .select((eb) => eb.fn.max("seq").as("max_seq"))
+        .where("session_key", "=", options.sessionKey),
+    );
+    const headSeq = head?.max_seq == null ? null : head.max_seq;
+    executeSqliteQuerySync(
+      database.db,
+      db
+        .updateTable("boxes")
+        .set({ state: "live", recalled_at_seq: headSeq })
+        .where("box_id", "=", options.boxId)
+        .where("session_key", "=", options.sessionKey),
     );
   }, options);
 }

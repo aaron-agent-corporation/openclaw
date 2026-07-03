@@ -55,6 +55,8 @@
     "!dist/plugin-sdk/provider-http-test-mocks.d.ts",
     "!dist/plugin-sdk/provider-test-contracts.js",
     "!dist/plugin-sdk/provider-test-contracts.d.ts",
+    "!dist/plugin-sdk/memory-core-host-store-testing.js",
+    "!dist/plugin-sdk/memory-core-host-store-testing.d.ts",
     "!dist/plugin-sdk/reply-payload-testing.js",
     "!dist/plugin-sdk/reply-payload-testing.d.ts",
     "!dist/plugin-sdk/sqlite-runtime-testing.js",
@@ -1164,6 +1166,10 @@
     "./plugin-sdk/memory-core-host-associative": {
       "types": "./dist/plugin-sdk/memory-core-host-associative.d.ts",
       "default": "./dist/plugin-sdk/memory-core-host-associative.js"
+    },
+    "./plugin-sdk/memory-core-host-associative-write": {
+      "types": "./dist/plugin-sdk/memory-core-host-associative-write.d.ts",
+      "default": "./dist/plugin-sdk/memory-core-host-associative-write.js"
     },
     "./plugin-sdk/memory-core-host-multimodal": {
       "types": "./dist/plugin-sdk/memory-core-host-multimodal.d.ts",

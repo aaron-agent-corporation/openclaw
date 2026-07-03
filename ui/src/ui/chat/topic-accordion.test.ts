@@ -74,6 +74,31 @@ describe("topic accordion strip", () => {
     expect(onToggleTopic).toHaveBeenCalledWith("box-folded", "live");
   });
 
+  it("shows a recalled marker only for a retrieval-auto-expanded box (D-02)", () => {
+    const container = document.createElement("div");
+    render(
+      renderTopicAccordion({
+        enabled: true,
+        accordion: {
+          boxes: [
+            { id: "recalled", label: "Fidel case", state: "live", summary: null, recalled: true },
+            { id: "manual", label: "Voice", state: "live", summary: null },
+          ],
+          spans: [],
+        },
+        onToggleTopic: () => undefined,
+      }),
+      container,
+    );
+    const markers = [...container.querySelectorAll(".chat-topic__recalled")].map((el) =>
+      el.textContent?.trim(),
+    );
+    // Only the retrieval-expanded box gets a recalled marker, and it names the topic.
+    expect(markers).toHaveLength(1);
+    expect(markers[0]).toContain("Fidel case");
+    expect(markers[0]).toContain("recalled");
+  });
+
   it("falls back to a summary or placeholder label when a box is unlabeled", () => {
     const container = document.createElement("div");
     render(

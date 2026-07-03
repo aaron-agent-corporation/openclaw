@@ -1365,6 +1365,7 @@ export const ar: TranslationMap = {
       collapse: "طي",
       expandTopic: "توسيع الموضوع {topic}",
       collapseTopic: "طي الموضوع {topic}",
+      recalled: "تم الاستدعاء: {topic}",
     },
     composer: {
       placeholder: "Message {name} (Enter to send)",

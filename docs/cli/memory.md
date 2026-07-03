@@ -1,5 +1,5 @@
 ---
-summary: "CLI reference for `openclaw memory` (status/index/search/promote/promote-explain/rem-harness)"
+summary: "CLI reference for `openclaw memory` (status/index/search/promote/promote-explain/rem-harness, plus core backfill/replay-eval)"
 read_when:
   - You want to index or search semantic memory
   - You're debugging memory availability or indexing
@@ -179,6 +179,27 @@ Notes:
 - `memory rem-backfill --path <file-or-dir> --stage-short-term` also seeds grounded durable candidates into the live short-term promotion store so the normal deep phase can rank them.
 - `memory rem-backfill --rollback` removes previously written grounded diary entries, and `memory rem-backfill --rollback-short-term` removes previously staged grounded short-term candidates.
 - See [Dreaming](/concepts/dreaming) for full phase descriptions and configuration reference.
+
+## Conversational memory maintenance
+
+Core (not the memory plugin) adds two per-agent maintenance subcommands for the
+durable conversational-memory store:
+
+```bash
+openclaw memory backfill --agent main
+openclaw memory replay-eval --agent main --json
+```
+
+- `memory backfill --agent <id>` seeds the agent's historical transcripts into the
+  durable per-agent turn store and organizes them into topic spans and boxes. Resumable:
+  an interrupted run continues from its cursor. Runs only via this explicit command,
+  never in the background.
+- `memory replay-eval --agent <id>` scores the retrieval auto-expand decision over the
+  backfilled history (read-only): every stored user query is replayed through the same
+  decision the runtime uses, and the command reports precision, recall, and a
+  recall-safety score. `--cutoff <number>` overrides the strong-match cutoff to compare
+  tunings; `--json` emits the raw result. Run `memory backfill` first — an empty store
+  evaluates nothing.
 
 ## Related
 

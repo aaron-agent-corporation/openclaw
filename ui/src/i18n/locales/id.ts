@@ -1381,6 +1381,7 @@ export const id: TranslationMap = {
       collapse: "Ciutkan",
       expandTopic: "Perluas topik {topic}",
       collapseTopic: "Ciutkan topik {topic}",
+      recalled: "diingat kembali: {topic}",
     },
     composer: {
       placeholder: "Message {name} (Enter to send)",

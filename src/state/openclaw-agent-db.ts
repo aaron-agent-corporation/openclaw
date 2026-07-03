@@ -34,10 +34,13 @@ export { resolveOpenClawAgentSqlitePath } from "./openclaw-agent-db.paths.js";
  * per pathname, protected with private file modes, and registered in the shared
  * OpenClaw state database for discovery and maintenance.
  */
+// v4: added additive nullable boxes.recalled_at_seq (Phase 5, 05-04). CREATE TABLE
+// IF NOT EXISTS never alters an existing table, so the column is backfilled onto
+// already-created v2/v3 boxes tables via an ADD COLUMN migration below.
 // v3: added associative-memory tags/entities/associations tables (Phase 3).
 // v2: added conversational-memory turns/spans/boxes tables (Phase 2). Additive,
 // CREATE TABLE IF NOT EXISTS — existing v1 DBs gain the tables on next open.
-const OPENCLAW_AGENT_SCHEMA_VERSION = 3;
+const OPENCLAW_AGENT_SCHEMA_VERSION = 4;
 const OPENCLAW_AGENT_DB_DIR_MODE = 0o700;
 const OPENCLAW_AGENT_DB_FILE_MODE = 0o600;
 
@@ -139,10 +142,25 @@ function assertExistingSchemaOwner(
   }
 }
 
+function agentTableHasColumn(db: DatabaseSync, tableName: string, columnName: string): boolean {
+  const rows = db.prepare(`PRAGMA table_info(${tableName})`).all() as Array<{ name?: unknown }>;
+  return rows.some((row) => row.name === columnName);
+}
+
+function ensureAgentAdditiveColumns(db: DatabaseSync): void {
+  // CREATE TABLE IF NOT EXISTS leaves an existing table untouched, so additive columns
+  // introduced after a table first shipped must be backfilled here (v4: boxes.recalled_at_seq).
+  // Nullable/additive only — destructive or shape-changing repairs belong in doctor.
+  if (!agentTableHasColumn(db, "boxes", "recalled_at_seq")) {
+    db.exec("ALTER TABLE boxes ADD COLUMN recalled_at_seq INTEGER;");
+  }
+}
+
 function ensureAgentSchema(db: DatabaseSync, agentId: string, pathname: string): void {
   assertSupportedAgentSchemaVersion(db, pathname);
   assertExistingSchemaOwner(readExistingSchemaMeta(db), agentId, pathname);
   db.exec(OPENCLAW_AGENT_SCHEMA_SQL);
+  ensureAgentAdditiveColumns(db);
   const kysely = getNodeSqliteKysely<OpenClawAgentMetadataDatabase>(db);
   db.exec(`PRAGMA user_version = ${OPENCLAW_AGENT_SCHEMA_VERSION};`);
   const now = Date.now();

@@ -2,10 +2,21 @@
 // for memory search ranking. No write APIs cross this boundary.
 export {
   readAssociativeContext,
+  readBoxRollupInputs,
   type AssociativeBoxContext,
   type AssociativeContext,
+  type BoxRollupInputs,
   readTagCooccurrence,
   type TagGraphNeighbor,
   type TagGraphTargetRef,
   type TagGraphTraversal,
+  computeImportance,
+  type ImportanceInputs,
+  type ImportanceResult,
+  ENRICHMENT_LOW_SALIENCE_FLOOR,
+  ENRICHMENT_MAX_BOXES_PER_NIGHT,
+  ENRICHMENT_MAX_TAG_EDGES_PER_NIGHT,
+  ENRICHMENT_MIN_COOCCURRENCE_WEIGHT,
+  ENRICHMENT_ROLLUP_MAX_CHARS,
+  ENRICHMENT_ROLLUP_MAX_TURNS,
 } from "./host/openclaw-runtime.js";

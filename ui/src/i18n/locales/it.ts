@@ -1388,6 +1388,7 @@ export const it: TranslationMap = {
       collapse: "Comprimi",
       expandTopic: "Espandi argomento {topic}",
       collapseTopic: "Comprimi argomento {topic}",
+      recalled: "richiamato: {topic}",
     },
     composer: {
       placeholder: "Message {name} (Enter to send)",

@@ -88,12 +88,14 @@ describe("readAccordionView", () => {
       label: "Voice",
       state: "live",
       summary: null,
+      recalled: false,
     });
     expect(view.boxes).toContainEqual({
       id: "box-folded",
       label: "Coding",
       state: "collapsed",
       summary: "Refactored the loader",
+      recalled: false,
     });
     expect(view.spans).toEqual([
       { boxId: "box-live", startSeq: 1, endSeq: 1, topic: "voice" },

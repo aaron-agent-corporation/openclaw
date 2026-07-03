@@ -19,6 +19,7 @@ import {
 import type { OpenClawPluginApi } from "openclaw/plugin-sdk/plugin-entry";
 import { appendRegularFile } from "openclaw/plugin-sdk/security-runtime";
 import { normalizeStringEntries, uniqueStrings } from "openclaw/plugin-sdk/string-coerce-runtime";
+import { runAssociativeEnrichment } from "./dreaming-enrichment.js";
 import { appendFailedDreamingEvent } from "./dreaming-events.js";
 import { writeDailyDreamingPhaseBlock } from "./dreaming-markdown.js";
 import {
@@ -1771,6 +1772,46 @@ async function runLightDreaming(params: {
   }
 }
 
+/**
+ * Run the associative enrichment producer for every agent bound to this workspace, on the
+ * unified `agent:{agentId}:main` session key (D2 unified session). Per-agent failures are
+ * logged and swallowed so one agent's store cannot abort the whole REM sweep. Enrichment is
+ * bounded + idempotent, so a swallowed error simply retries next night.
+ */
+async function runEnrichmentForWorkspaceAgents(params: {
+  workspaceDir: string;
+  cfg?: DreamingHostConfig;
+  primaryWorkspaceDir?: string;
+  logger: Logger;
+  nowMs: number;
+}): Promise<void> {
+  const agentIds = params.cfg
+    ? resolveSessionAgentsForWorkspace({
+        cfg: params.cfg,
+        workspaceDir: params.workspaceDir,
+        primaryWorkspaceDir: params.primaryWorkspaceDir,
+      })
+    : [];
+  // Fall back to the primary "main" agent when config resolution yields nothing (single-agent
+  // installs, tests) so the thin vertical still maintains the default agent's store.
+  const targets = agentIds.length > 0 ? agentIds : ["main"];
+  for (const agentId of targets) {
+    try {
+      await runAssociativeEnrichment({
+        agentId,
+        sessionKey: `agent:${agentId}:main`,
+        workspaceDir: params.workspaceDir,
+        nowMs: params.nowMs,
+        logger: params.logger,
+      });
+    } catch (err) {
+      params.logger.warn(
+        `memory-core: associative enrichment failed for agent ${agentId}: ${formatErrorMessage(err)}`,
+      );
+    }
+  }
+}
+
 async function runRemDreaming(params: {
   workspaceDir: string;
   cfg?: DreamingHostConfig;
@@ -1845,6 +1886,16 @@ async function runRemDreaming(params: {
       `memory-core: REM dreaming wrote reflections from ${entries.length} recent memory trace(s) [workspace=${params.workspaceDir}].`,
     );
   }
+  // Associative enrichment (05-03): consolidate the per-agent turns/spans/boxes store into
+  // real rollups + normalized importance + DAG parent edges, through the 05-01 write seam.
+  // Runs in REM where §7 places consolidation; bounded, idempotent, local-only, decision-logged.
+  await runEnrichmentForWorkspaceAgents({
+    workspaceDir: params.workspaceDir,
+    cfg: params.cfg,
+    primaryWorkspaceDir: params.primaryWorkspaceDir,
+    logger: params.logger,
+    nowMs,
+  });
   // Generate dream diary narrative from REM reflections.
   if (params.subagent && entries.length > 0) {
     const snippets = preview.candidateTruths.map((t) => t.snippet).filter(Boolean);

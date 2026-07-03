@@ -11,6 +11,11 @@ export type ChatAccordionBox = {
   label: string | null;
   state: ChatAccordionBoxState;
   summary: string | null;
+  /**
+   * True when this box was auto-expanded back into context by an accordion-aware retrieval match
+   * this turn (05-04 / D-02). Drives the visible `recalled: {topic}` marker on the control strip.
+   */
+  recalled?: boolean;
 };
 
 /** A span's box → seq-range mapping (carried for a later inline-fold consumer). */

@@ -1386,6 +1386,7 @@ export const ja_JP: TranslationMap = {
       collapse: "折りたたむ",
       expandTopic: "トピック {topic} を展開",
       collapseTopic: "トピック {topic} を折りたたむ",
+      recalled: "再表示: {topic}",
     },
     composer: {
       placeholder: "Message {name} (Enter to send)",

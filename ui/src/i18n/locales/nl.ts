@@ -1387,6 +1387,7 @@ export const nl: TranslationMap = {
       collapse: "Samenvouwen",
       expandTopic: "Onderwerp {topic} uitvouwen",
       collapseTopic: "Onderwerp {topic} samenvouwen",
+      recalled: "opgehaald: {topic}",
     },
     composer: {
       placeholder: "Message {name} (Enter to send)",

@@ -13,29 +13,88 @@ import type { AgentMessage } from "../runtime/index.js";
 import type { ContextEvent, ExtensionAPI, ExtensionFactory } from "../sessions/index.js";
 import { applyFold, messageAnchorId } from "./accordion-blocks.js";
 import { type AnchorBox, buildAccordionFoldPlan } from "./accordion-seq-walk.js";
+import { recalledMarkerText } from "./accordion-ui.js";
 import { applyAutoCollapse } from "./active-tag-set.js";
 import { turnIdempotencyKey } from "./turns-capture.js";
-import { getTurns, listBoxes, listSpans } from "./turns-store.js";
+import {
+  getTurns,
+  listBoxes,
+  type BoxRow,
+  listSpans,
+  readHeadSeq,
+  type SpanRow,
+} from "./turns-store.js";
 
 /**
- * Resolve each live message's collapsed/live box. Returns null (skip everything) when no
- * box is collapsed, so the common case avoids the heavier turn/span reads.
+ * Build the verbatim `recalled: {topic}` marker messages (D-02) for boxes auto-expanded by an
+ * accordion-aware retrieval match THIS turn. The box is already live (rendered verbatim), so the
+ * marker is a lightweight leading note that tells the owner/model why an old topic reappeared —
+ * the same mental model as the manual expand/collapse control. A box qualifies iff it is live AND
+ * its retrieval auto-expand stamped the current head seq (boxes.recalled_at_seq === head): the
+ * signal self-clears once the head advances, so a still-live box never re-emits the marker on a
+ * later turn. Manually-expanded or already-live boxes carry a stale/absent stamp and get no marker.
+ *
+ * KNOWN LIMITATIONS (D-02, deferred to Phase 6 Semantic Topic Retrieval, cm-unified-session-qnf):
+ * the head-seq-equality signal is imperfect — (a) the UI badge (accordion-ui.readAccordionView) is
+ * read AFTER agent_end has advanced the head, so it rarely lights; (b) a turn that captures no new
+ * turn (dedup/noise-only/capture-failure) leaves the head static, so this marker can re-fire; (c) a
+ * backfilled session with no captured turns stamps a null head, suppressing the marker. Phase 6
+ * reworks the recall path and will replace this with a turn-scoped signal that both consumers and
+ * the collapse decision share. The self-collapse and overlap fixes (05-08) are NOT part of this
+ * deferral — those are corrected.
+ */
+function buildRecalledMarkers(boxes: readonly BoxRow[], headSeq: number | null): AgentMessage[] {
+  if (headSeq == null) {
+    return [];
+  }
+  const markers: AgentMessage[] = [];
+  for (const box of boxes) {
+    if (box.state === "collapsed" || box.recalled_at_seq !== headSeq) {
+      continue;
+    }
+    markers.push({
+      role: "user",
+      content: [{ type: "text", text: recalledMarkerText(box.label ?? box.summary) }],
+    } as AgentMessage);
+  }
+  return markers;
+}
+
+/**
+ * Prebuilt seq -> owning box id lookup over a session's spans. Built in one pass with
+ * first-span-in-row-order wins, exactly matching the pre-refactor linear `spans.find()` semantics:
+ * `upsertSpan` never prunes, so stale/duplicate spans can overlap, and the first covering span (row
+ * order) must win. One O(sum span lengths ≈ turns) build + O(1) lookup avoids the O(messages ×
+ * spans) rescan the per-message linear find caused on the hot context path.
+ */
+function buildSeqToBoxId(spans: readonly SpanRow[]): (seq: number) => string | null {
+  const boxBySeq = new Map<number, string | null>();
+  for (const span of spans) {
+    for (let seq = span.start_seq; seq <= span.end_seq; seq++) {
+      if (!boxBySeq.has(seq)) {
+        boxBySeq.set(seq, span.box_id);
+      }
+    }
+  }
+  return (seq: number): string | null => boxBySeq.get(seq) ?? null;
+}
+
+/**
+ * Resolve each live message's collapsed/live box from the shared per-turn boxes snapshot. Returns
+ * null (skip everything) when no box is collapsed, so the common case avoids the heavier turn/span
+ * reads.
  */
 function resolveAnchorBoxes(
   agentId: string,
   sessionKey: string,
+  boxes: readonly BoxRow[],
   messages: readonly AgentMessage[],
 ): Map<string, AnchorBox> | null {
-  const boxes = listBoxes({ agentId, sessionKey });
   if (!boxes.some((box) => box.state === "collapsed")) {
     return null;
   }
   const boxById = new Map(boxes.map((box) => [box.box_id, box]));
-  const spans = listSpans({ agentId, sessionKey });
-  const seqToBoxId = (seq: number): string | null => {
-    const span = spans.find((s) => s.start_seq <= seq && seq <= s.end_seq);
-    return span?.box_id ?? null;
-  };
+  const seqToBoxId = buildSeqToBoxId(listSpans({ agentId, sessionKey }));
   const keyToSeq = new Map(
     getTurns({ agentId, sessionKey }).map((turn) => [turn.idempotency_key, turn.seq]),
   );
@@ -75,11 +134,23 @@ export function conversationalMemoryAccordionExtension(opts: {
   return (api: ExtensionAPI) => {
     api.on("context", (event: ContextEvent) => {
       let anchorToBox: Map<string, AnchorBox> | null;
+      let recalledMarkers: AgentMessage[];
       try {
         // Run the active-tag-set rule first (spec §16: collapse decision in the
         // context-pruning seam) so any newly-stale topic is folded out this turn.
         applyAutoCollapse({ agentId: opts.agentId, sessionKey: opts.sessionKey });
-        anchorToBox = resolveAnchorBoxes(opts.agentId, opts.sessionKey, event.messages);
+        // Read the post-collapse boxes ONCE per turn and share the snapshot across the recalled
+        // marker and anchor resolution — the box state is now settled for this turn, so re-reading
+        // it would only add redundant hot-path queries.
+        const boxes = listBoxes({ agentId: opts.agentId, sessionKey: opts.sessionKey });
+        // A retrieval-auto-expanded box (05-04) is now live and rendered verbatim; surface a
+        // `recalled: {topic}` marker (D-02) so the owner sees why the old topic reappeared. This
+        // is independent of the fold plan — a recalled box is not collapsed.
+        recalledMarkers = buildRecalledMarkers(
+          boxes,
+          readHeadSeq({ agentId: opts.agentId, sessionKey: opts.sessionKey }),
+        );
+        anchorToBox = resolveAnchorBoxes(opts.agentId, opts.sessionKey, boxes, event.messages);
       } catch (err) {
         // Never break a model call over the accordion; fall through to verbatim context.
         console.warn(
@@ -87,14 +158,12 @@ export function conversationalMemoryAccordionExtension(opts: {
         );
         return undefined;
       }
-      if (anchorToBox == null) {
+      const plan = anchorToBox == null ? null : buildAccordionFoldPlan(event.messages, anchorToBox);
+      const folded = plan && plan.size > 0 ? applyFold(event.messages, plan) : event.messages;
+      if (recalledMarkers.length === 0 && folded === event.messages) {
         return undefined;
       }
-      const plan = buildAccordionFoldPlan(event.messages, anchorToBox);
-      if (plan.size === 0) {
-        return undefined;
-      }
-      return { messages: applyFold(event.messages, plan) };
+      return { messages: [...recalledMarkers, ...folded] };
     });
   };
 }

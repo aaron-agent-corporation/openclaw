@@ -7,10 +7,12 @@
  * target + tag, so re-running over unchanged segmentation output upserts the same rows
  * with no churn. Suppressed/noise spans carry no topic and are skipped.
  *
- * Tag DAG parent edges are intentionally NOT written here. Segmentation makes one box
- * per topic, so the only co-occurrence signal is cross-box and would over-connect the
- * graph; durable DAG normalization belongs to the later dreaming slice. Entities,
- * model rollups, and memory-core indexing are also later slices.
+ * Tag DAG parent edges are produced by the dreaming enrichment pass
+ * (extensions/memory-core/src/dreaming-enrichment.ts) via the associative write seam, not on
+ * this capture path: capture stays flat-tag-only on the hot path (D10 — no hierarchy on the
+ * hot path), and durable broader/narrower DAG normalization runs offline in dreaming where
+ * cross-box co-occurrence can be judged without over-connecting the graph. Entities,
+ * model rollups, and memory-core indexing are handled in dreaming/retrieval slices too.
  */
 import { createHash } from "node:crypto";
 import type { OpenClawAgentDatabaseOptions } from "../../state/openclaw-agent-db.js";

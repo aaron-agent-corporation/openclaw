@@ -72,11 +72,59 @@ export type MemoryHostDreamCompletedEvent = {
   storageMode: "inline" | "separate" | "both";
 };
 
+/**
+ * §13 decision-log event: one entry per box the dreaming enrichment pass processed,
+ * recording the importance score + raw inputs and the action taken (rollup / DAG link) so a
+ * later precision/recall review can audit every collapse/importance decision. Best-effort
+ * diagnostics, appended to the same JSONL audit log as the other dream events.
+ */
+export type MemoryHostEnrichBoxEvent = {
+  type: "memory.enrich.box";
+  timestamp: string;
+  agentId: string;
+  boxId: string;
+  /** Normalized §7 importance score in [0,1]. */
+  importance: number;
+  /** Raw importance inputs, stored so weights can be retuned without re-deriving (TUNE-02). */
+  inputs: { recurrenceCount: number; turnDepth: number; effortSignal: number };
+  /** Length of the generated rollup summary (chars); 0 when no rollup was written. */
+  summaryChars: number;
+  /** DAG parent edges linked for this box's tags in this pass. */
+  linkedParents: number;
+  /**
+   * True when the box fell below the low-salience floor and a `suppression_rollup` note was
+   * written (05-06). Optional so older log lines without the field still parse.
+   */
+  suppressed?: boolean;
+};
+
+/**
+ * §13 decision-log record for one accordion-aware retrieval auto-expand decision (05-04 /
+ * RETR-01). One record per turn where the accordion-aware query mode evaluated a strong-match
+ * escalation, carrying the score and whether the box was expanded so the 05-05 replay harness
+ * can score precision/recall against held-out data (recall-safety-first, D-03).
+ */
+export type MemoryHostAutoExpandDecisionEvent = {
+  type: "memory.autoexpand.decision";
+  timestamp: string;
+  agentId: string;
+  /** The best-matching collapsed box, or null when nothing matched. */
+  boxId: string | null;
+  /** Normalized retrieval-match score of the best candidate, [0,1]. */
+  score: number;
+  /** The conservative strong-match cutoff in force for this decision. */
+  cutoff: number;
+  /** True when the score cleared the cutoff and the box was flipped to live this turn. */
+  expanded: boolean;
+};
+
 /** Append-only memory host event schema stored as JSONL. */
 export type MemoryHostEvent =
   | MemoryHostRecallRecordedEvent
   | MemoryHostPromotionAppliedEvent
-  | MemoryHostDreamCompletedEvent;
+  | MemoryHostDreamCompletedEvent
+  | MemoryHostEnrichBoxEvent
+  | MemoryHostAutoExpandDecisionEvent;
 
 /** Full event-log record schema, including opt-in diagnostic variants. */
 export type MemoryHostEventRecord = MemoryHostEvent | MemoryHostRecallSkippedEvent;
@@ -107,7 +155,9 @@ function parseMemoryHostEventRecord(line: string): MemoryHostEventRecord | null 
       record.type === "memory.recall.recorded" ||
       record.type === "memory.recall.skipped" ||
       record.type === "memory.promotion.applied" ||
-      record.type === "memory.dream.completed"
+      record.type === "memory.dream.completed" ||
+      record.type === "memory.enrich.box" ||
+      record.type === "memory.autoexpand.decision"
     ) {
       return record;
     }

@@ -1383,6 +1383,7 @@ export const fa: TranslationMap = {
       collapse: "جمع کردن",
       expandTopic: "گسترش موضوع {topic}",
       collapseTopic: "جمع کردن موضوع {topic}",
+      recalled: "فراخوانده شد: {topic}",
     },
     composer: {
       placeholder: "Message {name} (Enter to send)",

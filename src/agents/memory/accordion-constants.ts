@@ -43,3 +43,75 @@ export const SEGMENT_TOPIC_SIMILARITY_CUTOFF = 0.25;
  * normalized topic label before the tag-DAG slice maps labels to durable tags.
  */
 export const SEGMENT_TOPIC_TOKEN_LIMIT = 1;
+
+/**
+ * TUNABLE (Phase 5 — TUNE-02; spec §7). Additive importance weights for the
+ * dreaming enrichment score `w_r·norm(recurrence) + w_d·log(1+turn_depth) + w_e·effort`.
+ * Shipped as the spec defaults 0.4/0.3/0.3 (sum 1.0); Phase-5 stores the raw inputs so
+ * TUNE-02 can retune these against held-out spike boxes without re-deriving the score.
+ * Additive axes keep a recurrence=1 / high-effort thread from being zeroed (D11).
+ */
+export const IMPORTANCE_WEIGHT_RECURRENCE = 0.4;
+export const IMPORTANCE_WEIGHT_DEPTH = 0.3;
+export const IMPORTANCE_WEIGHT_EFFORT = 0.3;
+
+/**
+ * TUNABLE (Phase 5 — §7 normalization curve). Saturating half-saturation constant for the
+ * recurrence axis: `norm(recurrence) = recurrence / (recurrence + k)`. With k the axis is
+ * monotonic but bounded in [0,1), so an unbounded recurrence count cannot dominate the
+ * score regardless of the weight. k is the recurrence count at which the axis reaches 0.5.
+ */
+export const IMPORTANCE_RECURRENCE_HALF_SATURATION = 3;
+
+/**
+ * TUNABLE (Phase 5 — §7/§13 bounded deep-pass). Per-night caps for the dreaming enrichment
+ * producer so the pass cannot run unbounded as the graph grows: at most this many boxes are
+ * enriched, and at most this many DAG parent edges are linked, per invocation. Enrichment is
+ * idempotent, so a capped run simply resumes uncovered boxes on the next night.
+ */
+export const ENRICHMENT_MAX_BOXES_PER_NIGHT = 200;
+export const ENRICHMENT_MAX_TAG_EDGES_PER_NIGHT = 100;
+
+/**
+ * TUNABLE (Phase 5 — §7 deep DAG). Minimum co-occurrence weight (shared durable targets)
+ * before the enrichment pass proposes a broader/narrower tag DAG parent edge. A parent must
+ * additionally co-occur across the child's whole shared-target set and span strictly more
+ * targets, so this floor need only require genuine (non-empty) co-occurrence; the structural
+ * broader-than test is what keeps the graph from over-connecting (recall-safety-first).
+ */
+export const ENRICHMENT_MIN_COOCCURRENCE_WEIGHT = 1;
+
+/** TUNABLE (Phase 5). Max non-noise turns folded into one box rollup summary. */
+export const ENRICHMENT_ROLLUP_MAX_TURNS = 6;
+
+/** TUNABLE (Phase 5). Max characters per rollup summary (bounded, local heuristic). */
+export const ENRICHMENT_ROLLUP_MAX_CHARS = 600;
+
+/**
+ * TUNABLE (Phase 5 — TUNE-02; spec §6.4/§9 conservative strong-match auto-expand). The
+ * retrieval-match score (normalized token overlap between the turn query and an indexed
+ * box/entity/tag rollup, [0,1]) at or above which the accordion-aware query mode auto-expands
+ * the matched collapsed box for the current turn. Shipped as a deliberately CONSERVATIVE default
+ * (strong-match only, recall-safety-first D-07/D-09): a weak/near-threshold match must NOT
+ * auto-expand — better to leave a box collapsed than to surface the wrong old matter. The
+ * replay precision/recall harness (05-05) retunes this against held-out data.
+ */
+export const ACCORDION_STRONG_MATCH_CUTOFF = 0.6;
+
+/**
+ * TUNABLE (Phase 5 — 05-06; §7 low-salience suppression). Normalized §7 importance strictly
+ * below this floor marks a box as low-salience: the dreaming pass writes a short deterministic
+ * `suppression_rollup` note for it, and retrieval requires a HIGHER effective cutoff before a
+ * LEXICAL-only match auto-expands it (an exact-entity mention is never suppressed —
+ * recall-safety-first, D-07/D-09). Deliberately low so only genuinely faint boxes are damped;
+ * TUNE-02's replay harness retunes it against held-out data.
+ */
+export const ENRICHMENT_LOW_SALIENCE_FLOOR = 0.35;
+
+/**
+ * TUNABLE (Phase 5 — 05-06; §6.4/§9 recall-safe suppression). Added to the strong-match cutoff
+ * for a LEXICAL-only match against a low-salience (suppressed) collapsed box, so a faint topic
+ * needs near-complete lexical coverage to auto-expand. Never applied to an exact-entity match:
+ * a precise reference to a suppressed topic must still surface (recall-safety-first, D-07/D-09).
+ */
+export const ACCORDION_SUPPRESSION_CUTOFF_BUMP = 0.2;

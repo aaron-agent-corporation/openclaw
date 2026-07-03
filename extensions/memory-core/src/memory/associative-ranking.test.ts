@@ -15,6 +15,9 @@ function context(boxes: Partial<AssociativeContext["boxes"][number]>[]): Associa
       state: box.state ?? "live",
       tags: box.tags ?? [],
       entities: box.entities ?? [],
+      importance: box.importance ?? null,
+      summaryEmbeddingRef: box.summaryEmbeddingRef ?? null,
+      suppressionRollup: box.suppressionRollup ?? null,
     })),
   };
 }
@@ -46,6 +49,23 @@ describe("augmentMemoryResultsWithAssociativeContext", () => {
       boost: 0.9,
     });
     expect(out.map((r) => r.id)).toEqual(["a", "b"]);
+  });
+
+  it("returns each matched hit carrying its boosted score (survives a later score read)", () => {
+    const out = augmentMemoryResultsWithAssociativeContext({
+      results,
+      context: context([{ entities: ["NEBULA-73"] }]),
+      boost: 0.5,
+      entityBoost: 0.5,
+    });
+    // The matched hit's score is boosted on the returned object, not just reordered: 0.4*1.5=0.6.
+    const boosted = out.find((r) => r.id === "b");
+    const untouched = out.find((r) => r.id === "a");
+    expect(boosted?.score).toBeCloseTo(0.6, 10);
+    expect(untouched?.score).toBe(0.5);
+    // A downstream re-sort by the returned score keeps the associative ordering.
+    const resorted = out.toSorted((x, y) => y.score - x.score);
+    expect(resorted.map((r) => r.id)).toEqual(["b", "a"]);
   });
 
   it("does not mutate the input results", () => {

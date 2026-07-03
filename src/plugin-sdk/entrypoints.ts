@@ -76,6 +76,7 @@ export const publicPluginOwnedSdkEntrypoints = [
   "memory-core-host-engine-qmd",
   "memory-core-host-engine-storage",
   "memory-core-host-associative",
+  "memory-core-host-associative-write",
   "memory-core-host-events",
   "memory-core-host-multimodal",
   "memory-core-host-query",

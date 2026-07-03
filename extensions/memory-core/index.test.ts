@@ -105,6 +105,24 @@ describe("memory-core plugin runtime registration", () => {
     expect(command?.description).toContain("Enable or disable");
   });
 
+  it("registers the tag co-occurrence traversal tool with a unique name", () => {
+    const registeredNames: string[] = [];
+    plugin.register(
+      createTestPluginApi({
+        registerTool(_factory, options) {
+          for (const name of options?.names ?? []) {
+            registeredNames.push(name);
+          }
+        },
+      }),
+    );
+
+    expect(registeredNames).toContain("memory_tag_neighbors");
+    expect(registeredNames).toContain("memory_search");
+    expect(registeredNames).toContain("memory_get");
+    expect(new Set(registeredNames).size).toBe(registeredNames.length);
+  });
+
   it("wires scoped memory search cleanup through the lazy runtime", async () => {
     const runtime = registerMemoryCoreRuntime();
     const cfg = {} as OpenClawConfig;

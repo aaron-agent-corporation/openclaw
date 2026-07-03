@@ -1387,6 +1387,7 @@ export const tr: TranslationMap = {
       collapse: "Daralt",
       expandTopic: "{topic} konusunu genişlet",
       collapseTopic: "{topic} konusunu daralt",
+      recalled: "hatırlandı: {topic}",
     },
     composer: {
       placeholder: "Message {name} (Enter to send)",

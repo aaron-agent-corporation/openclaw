@@ -86,6 +86,7 @@ export type BoxLike = {
   box_id: string;
   state: string;
   last_active_seq?: number | null;
+  recalled_at_seq?: number | null;
 };
 
 export type CollapseInput = {
@@ -193,10 +194,20 @@ export function decideAutoCollapse(
     }
   }
   const headSeq = nonNoise[nonNoise.length - 1].seq;
+  // Head over ALL turns (incl. noise) — the same value setBoxRecalledLive stamps into
+  // recalled_at_seq. A box retrieval-auto-expanded THIS turn carries recalled_at_seq === this head.
+  const recalledHead = input.turns.reduce((max, turn) => (turn.seq > max ? turn.seq : max), 0);
 
   const toCollapse: string[] = [];
   for (const box of input.boxes) {
     if (box.state !== "live") {
+      continue;
+    }
+    // Never collapse a box that retrieval auto-expanded this turn: the auto-expand runs before this
+    // collapse pass and stamped recalled_at_seq to the current head, so re-collapsing it here would
+    // silently undo the deliberate recall before the context render surfaces it. Self-clears once
+    // the head advances next turn (recalled_at_seq stops equalling the head), so it is not sticky.
+    if (box.recalled_at_seq != null && box.recalled_at_seq === recalledHead) {
       continue;
     }
     const topics = boxTopics.get(box.box_id);
