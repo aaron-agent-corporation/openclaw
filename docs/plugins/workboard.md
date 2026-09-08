@@ -302,8 +302,11 @@ schedule:
   stranded by a missed event and live workers are never double-started.
 - Each worker lane advances independently. A lane stays held while its owner
   still has running work or an unaccepted `review` card with an active claim;
-  completing, blocking, or releasing that card frees the lane. Blocked or done
-  cards elsewhere on the board do not stop other lanes.
+  completing, blocking, or releasing that card frees the lane. A worker that
+  dies (Gateway restart, kill, timeout) releases its claim when the lifecycle
+  sync moves the card to `blocked`, so the lane frees on that sweep instead of
+  waiting for the claim TTL. Blocked or done cards elsewhere on the board do
+  not stop other lanes.
 - Start failures are recorded on the card exactly as for manual dispatch. When
   a failure leaves the card `ready` (for example a workspace authority
   problem), the board backs off from 1 minute up to 15 minutes while its state

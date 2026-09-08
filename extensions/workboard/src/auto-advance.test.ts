@@ -363,6 +363,27 @@ describe("Workboard auto-advance", () => {
     await expect(store.get(child.id)).resolves.toMatchObject({ status: "running" });
   });
 
+  it("starts the next card in the same lane after its worker is killed by a restart", async () => {
+    const { store, service, run } = await createHarness();
+    await enableBoard(store);
+    const first = await createReadyCard(store, { title: "Killed", agentId: "roscoe" });
+    const second = await createReadyCard(store, { title: "Next up", agentId: "roscoe" });
+    await service.settle();
+    expect(run).toHaveBeenCalledTimes(1);
+    await expect(store.get(second.id)).resolves.toMatchObject({ status: "ready" });
+
+    // The Gateway restart ends the worker session; the lifecycle sweep reports it.
+    await endWorker(store, first, "error");
+    service.onLifecycleMatched({ cards: [first] });
+    await service.settle();
+
+    const killed = await store.get(first.id);
+    expect(killed?.status).toBe("blocked");
+    expect(killed?.metadata?.claim).toBeUndefined();
+    expect(run).toHaveBeenCalledTimes(2);
+    await expect(store.get(second.id)).resolves.toMatchObject({ status: "running" });
+  });
+
   it("keeps advancing other lanes when an unrelated card failed earlier", async () => {
     const { store, service, run } = await createHarness();
     await enableBoard(store);

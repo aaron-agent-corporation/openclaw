@@ -9,6 +9,7 @@ import {
 } from "./lifecycle-sync.js";
 import type { PersistedWorkboardCard, WorkboardKeyedStore } from "./persistence-types.js";
 import { workboardSessionKeyForCard } from "./session-link.js";
+import { workboardCardConsumesOwnerSlot } from "./store-constants.js";
 import { WorkboardStore } from "./store.js";
 
 function createMemoryStore(): WorkboardKeyedStore {
@@ -341,6 +342,58 @@ describe("Workboard gateway lifecycle sync", () => {
       });
     },
   );
+
+  it("releases a failed worker's claim so its owner lane frees immediately", async () => {
+    const store = new WorkboardStore(createMemoryStore());
+    const sessionKey = "agent:main:subagent:workboard-default-killed-claim";
+    const card = await createLinkedCard(store, {
+      sessionKey,
+      runId: "run-killed",
+      execution: execution(sessionKey, "run-killed"),
+    });
+    const claimed = await store.claim(card.id, { ownerId: "main", ttlSeconds: 3_600 });
+    expect(workboardCardConsumesOwnerSlot(claimed.card, Date.now())).toBe(true);
+
+    await syncWorkboardSubagentEnded({
+      store,
+      event: {
+        targetSessionKey: sessionKey,
+        runId: "run-killed",
+        endedAt: claimed.card.updatedAt + 1,
+        outcome: "killed",
+      },
+    });
+
+    const blocked = await store.get(card.id);
+    expect(blocked).toMatchObject({ status: "blocked", execution: { status: "blocked" } });
+    expect(blocked?.metadata?.claim).toBeUndefined();
+    expect(workboardCardConsumesOwnerSlot(blocked as NonNullable<typeof blocked>, Date.now())).toBe(
+      false,
+    );
+  });
+
+  it("repairs a blocked card that kept a dead worker's claim on the next sweep", async () => {
+    const store = new WorkboardStore(createMemoryStore());
+    const sessionKey = "agent:main:subagent:workboard-default-leaked-claim";
+    const card = await createLinkedCard(store, {
+      status: "blocked",
+      sessionKey,
+      runId: "run-leaked",
+      execution: execution(sessionKey, "run-leaked", "blocked"),
+    });
+    // Rows written before failed workers released claims still hold the lane.
+    const leaked = await store.claim(card.id, { ownerId: "main", ttlSeconds: 3_600 });
+    expect(workboardCardConsumesOwnerSlot(leaked.card, Date.now())).toBe(true);
+
+    await runSessionSweep({
+      store,
+      sessions: [{ key: sessionKey, status: "failed", updatedAt: leaked.card.updatedAt + 1 }],
+    });
+
+    const repaired = await store.get(card.id);
+    expect(repaired?.status).toBe("blocked");
+    expect(repaired?.metadata?.claim).toBeUndefined();
+  });
 
   it("updates execution attempts once when duplicate failure hooks arrive", async () => {
     const store = new WorkboardStore(createMemoryStore());

@@ -402,6 +402,12 @@ export class WorkboardStore extends WorkboardNotificationStore {
               updatedAt: input.now,
             };
           }
+          // A worker whose session failed can no longer heartbeat or release its
+          // claim. Drop it here so the owner's lane frees for the next Ready card
+          // instead of staying busy until the claim TTL runs out.
+          if (associationIsCurrent && input.executionStatus === "blocked" && card.metadata?.claim) {
+            metadata = { ...metadata, claim: undefined };
+          }
           if (associationIsCurrent && input.stale) {
             const existing = card.metadata?.stale;
             if (
