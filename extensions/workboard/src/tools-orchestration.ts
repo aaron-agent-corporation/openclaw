@@ -4,6 +4,7 @@ import type { AnyAgentTool } from "openclaw/plugin-sdk/plugin-entry";
 import { asNonArrayRecord } from "openclaw/plugin-sdk/string-coerce-runtime";
 import type { AgentToolResult } from "openclaw/plugin-sdk/tool-results";
 import { Type } from "typebox";
+import type { WorkboardAutoAdvanceService } from "./auto-advance.js";
 import { redactClaimToken } from "./card-redaction.js";
 import type { WorkboardStore } from "./store.js";
 import { cardIdField, claimTokenField, strictObject } from "./tools-card-mutations.js";
@@ -34,6 +35,7 @@ const OptionalOperatorNoteField = Type.Optional(
 
 export function createWorkboardOrchestrationTools(params: {
   store: WorkboardStore;
+  autoAdvance?: Pick<WorkboardAutoAdvanceService, "describeBoards">;
   ownerId: string;
   requireScopedCard: (
     store: WorkboardStore,
@@ -62,9 +64,15 @@ export function createWorkboardOrchestrationTools(params: {
     {
       name: "workboard_boards",
       label: "Workboard Boards",
-      description: "List Workboard board namespaces with active, archived, and status counts.",
+      description:
+        "List Workboard board namespaces with active, archived, and status counts, plus automatic queue advancement status.",
       parameters: strictObject({}),
-      execute: async () => jsonResult(await store.listBoards()),
+      execute: async () => {
+        const { boards } = await store.listBoards();
+        return jsonResult({
+          boards: params.autoAdvance ? params.autoAdvance.describeBoards(boards) : boards,
+        });
+      },
     },
     {
       name: "workboard_board_create",
@@ -101,6 +109,12 @@ export function createWorkboardOrchestrationTools(params: {
             defaultAssignee: Type.Optional(Type.String({ description: "Default assignee." })),
             orchestratorProfile: Type.Optional(
               Type.String({ description: "Orchestrator profile id." }),
+            ),
+            autoAdvance: Type.Optional(
+              Type.Boolean({
+                description:
+                  "Start eligible Ready cards automatically whenever a worker lane frees up.",
+              }),
             ),
           }),
         ),

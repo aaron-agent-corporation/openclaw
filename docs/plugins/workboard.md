@@ -279,6 +279,47 @@ Board metadata can set `autoDecompose`, `autoDecomposePerDispatch`,
 exposes it in worker context; actual specification/decomposition still runs
 through the normal Workboard tools.
 
+### Automatic queue advancement
+
+Boards are manual by default: nothing starts until an operator, the CLI, the
+slash command, or an attached automation dispatches. A board can opt in to
+Gateway-owned advancement with the persisted `orchestration.autoAdvance`
+board setting (board header toggle **Auto-advance on/off**,
+`workboard.boards.upsert`, or the `workboard_board_create` tool). Existing
+boards stay manual until an operator enables it; archived boards never
+auto-launch.
+
+When enabled, the Gateway runs the same dispatch pass described above - same
+selection, claims, capacity rules, workspace and sandbox checks, run tracking,
+and failure handling - as deterministic code, with no model call and no cron
+schedule:
+
+- A worker or agent end hook, any card or board mutation, and the once-a-minute
+  lifecycle sweep each request a pass. Requests within 250 ms coalesce, passes
+  never overlap, and a pass re-runs when eligibility changed while it ran.
+- After a Gateway restart the first pass waits for the lifecycle sweep to
+  settle prepared launches and live sessions, so an eligible queue is never
+  stranded by a missed event and live workers are never double-started.
+- Each worker lane advances independently. A lane stays held while its owner
+  still has running work or an unaccepted `review` card with an active claim;
+  completing, blocking, or releasing that card frees the lane. Blocked or done
+  cards elsewhere on the board do not stop other lanes.
+- Start failures are recorded on the card exactly as for manual dispatch. When
+  a failure leaves the card `ready` (for example a workspace authority
+  problem), the board backs off from 1 minute up to 15 minutes while its state
+  is unchanged; any relevant card change resets the backoff.
+- Turning auto-advance off stops new automatic starts only. Running workers
+  continue and finish through the normal lifecycle.
+
+The board header shows the current state: enabled, the reason Ready work is
+not starting (empty queue, which owner is busy with which card, or the start
+error), and the last start failure. `workboard.boards.list` and the
+`workboard_boards` tool return the same `autoAdvance` status object.
+
+If a board also has an attached automation job, both keep running; retire the
+polling automation once auto-advance is enabled so two dispatchers do not race
+for the same claims.
+
 ## CLI and slash command
 
 ```bash
@@ -444,6 +485,15 @@ sessions can list cards but cannot create, edit, move, or delete them.
 
 Check the card's agent id and linked session, then open Sessions or Chat to
 inspect the actual run state.
+
+**Auto-advance is on but Ready work does not start**
+
+Read the status line under the board title (also returned by
+`workboard.boards.list` as `autoAdvance`). A held lane names the busy owner
+and the card it is finishing; a start failure names the card and error and the
+board retries after its backoff. Auto-advance only starts passes after the
+Gateway reports ready, so a board that says "Waiting for Gateway start" is
+still in startup.
 
 **Dispatch does not start a worker**
 

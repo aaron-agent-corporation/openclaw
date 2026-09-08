@@ -307,6 +307,7 @@ function createDefaultState(): WorkboardUiState {
     missingTaskIds: new Set(),
     lastDispatchSummary: null,
     dispatching: false,
+    boardSettingsSaving: false,
     query: "",
     priorityFilter: "all",
     agentFilter: "all",

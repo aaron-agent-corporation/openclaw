@@ -21,6 +21,7 @@ import {
   handleWorkboardChanged,
   loadWorkboard,
   resumeWorkboardLiveRefresh,
+  setWorkboardBoardAutoAdvance,
   stopWorkboardLifecycleRefresh,
   stopWorkboardLiveRefresh,
   syncWorkboardLifecycle,
@@ -28,12 +29,32 @@ import {
   type WorkboardUiState,
   WORKBOARD_CHANGED_EVENT,
 } from "../../lib/workboard/index.ts";
+import type { WorkboardBoardSummary } from "../../lib/workboard/types.ts";
 import { OpenClawLightDomElement } from "../../lit/openclaw-element.ts";
 import { SubscriptionsController } from "../../lit/subscriptions-controller.ts";
 import { matchesAgentScope } from "./agent-filter.ts";
 import { matchesBoardFilter, WORKBOARD_ALL_BOARDS_FILTER } from "./board-filter.ts";
 import type { WorkboardRouteData } from "./route.ts";
 import { renderWorkboard } from "./view.ts";
+
+function renderAutoAdvanceStatus(board: WorkboardBoardSummary) {
+  if (board.orchestration?.autoAdvance !== true) {
+    return nothing;
+  }
+  const status = board.autoAdvance;
+  const reason = status?.idleReason ?? t("workboard.autoAdvancePending");
+  const failure = status?.lastFailure;
+  return html`<div class="workboard-auto-advance-status" role="status">
+    <span>${t("workboard.autoAdvanceStatus", { reason })}</span>
+    ${failure
+      ? html`<span class="workboard-auto-advance-status__failure"
+          >${t("workboard.autoAdvanceLastFailure", {
+            error: failure.title ? `${failure.title}: ${failure.error}` : failure.error,
+          })}</span
+        >`
+      : nothing}
+  </div>`;
+}
 
 function reconcileCardOverlays(
   state: WorkboardUiState,
@@ -327,6 +348,35 @@ class WorkboardPage extends OpenClawLightDomElement {
     });
   }
 
+  private renderAutoAdvanceToggle(board: WorkboardBoardSummary, canWrite: boolean) {
+    const context = this.context;
+    if (!context) {
+      return nothing;
+    }
+    const enabled = board.orchestration?.autoAdvance === true;
+    if (!canWrite && !enabled) {
+      return nothing;
+    }
+    const label = enabled ? t("workboard.autoAdvanceOn") : t("workboard.autoAdvanceOff");
+    return html`<button
+      class="chip workboard-auto-advance-toggle"
+      type="button"
+      aria-pressed=${enabled ? "true" : "false"}
+      title=${t("workboard.autoAdvanceToggleTitle")}
+      ?disabled=${!canWrite || context.workboard.state.boardSettingsSaving}
+      @click=${() =>
+        void setWorkboardBoardAutoAdvance({
+          host: context.workboard,
+          client: context.gateway.snapshot.client,
+          boardId: board.id,
+          enabled: !enabled,
+          requestUpdate: this.requestPageUpdate,
+        })}
+    >
+      ${icons.zap}<span>${label}</span>
+    </button>`;
+  }
+
   private selectedBoard() {
     const context = this.context;
     const boardId = this.routeData?.boardFilter;
@@ -378,10 +428,14 @@ class WorkboardPage extends OpenClawLightDomElement {
                   ${icons.calendarClock}<span>${t("workboard.automationAttached")}</span>
                 </a>`
               : nothing}
+            ${selectedBoard
+              ? this.renderAutoAdvanceToggle(selectedBoard, access.canWrite)
+              : nothing}
           </div>
           ${selectedBoard
             ? html`<div class="page-subtitle">${titleForRoute("workboard")}</div>`
             : nothing}
+          ${selectedBoard ? renderAutoAdvanceStatus(selectedBoard) : nothing}
         </div>
         ${renderAgentScopeControl({
           agents: context.agents.state.agentsList?.agents ?? [],

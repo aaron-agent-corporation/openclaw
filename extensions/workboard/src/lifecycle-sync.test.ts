@@ -559,6 +559,39 @@ describe("Workboard gateway lifecycle sync", () => {
     expect((await store.get(card.id))?.metadata?.stale).toBeUndefined();
   });
 
+  it("reports reconciliation only after a complete sweep that did not fail", async () => {
+    const store = new WorkboardStore(createMemoryStore());
+    await createLinkedCard(store, { sessionKey: "agent:main:subagent:workboard-default-x" });
+    const readSessions = vi
+      .fn()
+      .mockRejectedValueOnce(new Error("sessions unavailable"))
+      .mockResolvedValueOnce({ sessions: [], complete: false })
+      .mockResolvedValue({ sessions: [], complete: true });
+    const onReconciled = vi.fn();
+    const context = { logger: { warn: vi.fn() } } as never;
+    vi.useFakeTimers();
+    const service = createWorkboardLifecycleService({ store, readSessions, onReconciled });
+
+    await service.start(context);
+    service.onGatewayStart();
+    await vi.waitFor(() => expect(readSessions).toHaveBeenCalledOnce());
+    await vi.advanceTimersByTimeAsync(0);
+    expect(onReconciled).not.toHaveBeenCalled();
+
+    await vi.advanceTimersByTimeAsync(60_000);
+    await vi.waitFor(() => expect(readSessions).toHaveBeenCalledTimes(2));
+    await vi.advanceTimersByTimeAsync(0);
+    expect(onReconciled).not.toHaveBeenCalled();
+
+    await vi.advanceTimersByTimeAsync(60_000);
+    await vi.waitFor(() => expect(readSessions).toHaveBeenCalledTimes(3));
+    await vi.advanceTimersByTimeAsync(0);
+    expect(onReconciled).toHaveBeenCalledOnce();
+
+    service.onGatewayStop();
+    await service.stop?.(context);
+  });
+
   it("skips session discovery for an empty board", async () => {
     const store = new WorkboardStore(createMemoryStore());
     const readSessions = vi.fn().mockResolvedValue({ sessions: [], complete: true });

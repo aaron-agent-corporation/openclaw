@@ -1,4 +1,5 @@
 // Workboard tests cover gateway plugin behavior.
+import type { WorkboardBoardSummary } from "@openclaw/workboard-contract";
 import { describe, expect, it, vi } from "vitest";
 import type { OpenClawPluginApi } from "../api.js";
 import { registerWorkboardGatewayMethods } from "./gateway.js";
@@ -186,6 +187,46 @@ describe("workboard gateway methods", () => {
     } as never);
     expect(eventsRespond.mock.calls[0]?.[0]).toBe(false);
     expect(eventsRespond.mock.calls[0]?.[2]?.message).toContain("workboard.notifications.advance");
+  });
+
+  it("annotates board listings with auto-advance status when the service is attached", async () => {
+    type RegisteredMethod = {
+      handler: Parameters<OpenClawPluginApi["registerGatewayMethod"]>[1];
+      opts: Parameters<OpenClawPluginApi["registerGatewayMethod"]>[2];
+    };
+    const methods = new Map<string, RegisteredMethod>();
+    const store = new WorkboardStore(createMemoryStore());
+    const api = {
+      registerGatewayMethod: vi.fn(
+        (method: string, handler: RegisteredMethod["handler"], opts: RegisteredMethod["opts"]) => {
+          methods.set(method, { handler, opts });
+        },
+      ),
+    } as unknown as OpenClawPluginApi;
+    const describeBoards = vi.fn((boards: WorkboardBoardSummary[]) =>
+      boards.map((board) =>
+        board.id === "ops"
+          ? { ...board, autoAdvance: { enabled: true, idleReason: "No Ready cards are waiting." } }
+          : board,
+      ),
+    );
+    registerWorkboardGatewayMethods({ api, store, autoAdvance: { describeBoards } });
+    await store.upsertBoard({ id: "ops", orchestration: { autoAdvance: true } });
+
+    const respond = vi.fn();
+    await methods.get("workboard.boards.list")?.handler({ params: {}, respond } as never);
+
+    expect(respond.mock.calls[0]?.[0]).toBe(true);
+    expect(respond.mock.calls[0]?.[1]).toMatchObject({
+      boards: [
+        expect.objectContaining({ id: "default" }),
+        expect.objectContaining({
+          id: "ops",
+          orchestration: { autoAdvance: true },
+          autoAdvance: { enabled: true, idleReason: "No Ready cards are waiting." },
+        }),
+      ],
+    });
   });
 
   it("applies connected client workspace access when accepting card paths", async () => {

@@ -311,6 +311,7 @@ export type WorkboardBoardSummary = {
   automationJobId?: string;
   defaultWorkspace?: WorkboardWorkspace;
   orchestration?: WorkboardOrchestrationSettings;
+  autoAdvance?: WorkboardAutoAdvanceStatus;
   total: number;
   active: number;
   archived: number;
@@ -324,6 +325,26 @@ export type WorkboardOrchestrationSettings = {
   autoDecomposePerDispatch?: number;
   defaultAssignee?: string;
   orchestratorProfile?: string;
+  autoAdvance?: boolean;
+};
+
+export type WorkboardAutoAdvanceTrigger =
+  | "gateway-start"
+  | "lifecycle"
+  | "change"
+  | "sweep"
+  | "manual";
+
+// Gateway-side observation from the latest automatic dispatch pass for a board.
+// `enabled` mirrors persisted board intent; the rest is runtime diagnostic state.
+export type WorkboardAutoAdvanceStatus = {
+  enabled: boolean;
+  lastPassAt?: number;
+  lastTrigger?: WorkboardAutoAdvanceTrigger;
+  idleReason?: string;
+  lastStart?: { cardId: string; title: string; runId: string; at: number };
+  lastFailure?: { error: string; at: number; cardId?: string; title?: string };
+  retryAt?: number;
 };
 
 export type WorkboardNotificationSubscription = {

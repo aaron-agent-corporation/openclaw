@@ -57,7 +57,7 @@ export async function cleanupWorkboardCardWorktree(params: {
   worktrees: WorkboardWorktreeCleanupRuntime;
   card: WorkboardCard;
   workspaceMutation?: WorkboardWorkspaceMutation;
-}): Promise<void> {
+}): Promise<WorkboardCard | undefined> {
   const current = await params.store.get(params.card.id);
   const workspace = (params.workspaceMutation?.after ?? current)?.metadata?.automation?.workspace;
   if (
@@ -67,7 +67,7 @@ export async function cleanupWorkboardCardWorktree(params: {
     !workspace?.path ||
     !workspace.sourcePath
   ) {
-    return;
+    return undefined;
   }
   const removed = await params.worktrees.removeIfLossless({
     path: workspace.path,
@@ -75,16 +75,17 @@ export async function cleanupWorkboardCardWorktree(params: {
     ownerId: params.card.id,
   });
   if (!removed && (await pathExists(workspace.path))) {
-    return;
+    return undefined;
   }
   if (params.workspaceMutation) {
-    await params.store.compensateWorkspaceMutation(
+    return await params.store.compensateWorkspaceMutation(
       params.workspaceMutation.before,
       params.workspaceMutation.after,
     );
-    return;
   }
-  await params.store.update(
+  // Return the exact written version so dispatch can distinguish its own
+  // cleanup write from a concurrent operator edit.
+  return await params.store.update(
     current.id,
     {
       workspace: {

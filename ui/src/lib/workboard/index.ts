@@ -39,6 +39,7 @@ export {
   dispatchWorkboard,
   moveWorkboardCard,
   saveWorkboardCardDraft,
+  setWorkboardBoardAutoAdvance,
 } from "./mutations.ts";
 export { startWorkboardCard, stopWorkboardCard } from "./execution.ts";
 export {

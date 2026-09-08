@@ -21,8 +21,9 @@ import {
   type ResolveAgentWorkspaceRuntime,
 } from "./dispatcher-workspace.js";
 import { workboardSessionKeyForCard } from "./session-link.js";
-import { cardBoardId } from "./store-card-helpers.js";
+import { cardBoardId, WorkboardStartGateRefusedError } from "./store-card-helpers.js";
 import { workboardCardConsumesOwnerSlot, workboardCardSlotOwner } from "./store-constants.js";
+import type { WorkboardClaimOptions } from "./store-inputs.js";
 import { WorkboardStore, type WorkboardDispatchResult } from "./store.js";
 import {
   assertCanonicalWorkboardRootAccess,
@@ -48,9 +49,11 @@ export type WorkboardDispatchStartOptions = {
   resolveAgentWorkspace?: (agentId?: string) => string;
   resolveAgentWorkspaceRuntime?: ResolveAgentWorkspaceRuntime;
   workspaceAccess?: WorkboardWorkspaceAccess;
+  /** Evaluated inside each claim mutation; a refusal ends the pass without recording a failure. */
+  startGate?: WorkboardClaimOptions["startGate"];
 };
 
-type WorkboardStartedRun = {
+export type WorkboardStartedRun = {
   cardId: string;
   title: string;
   sessionKey: string;
@@ -58,13 +61,15 @@ type WorkboardStartedRun = {
   card?: WorkboardCard;
 };
 
-type WorkboardStartFailure = {
+export type WorkboardStartFailure = {
   cardId: string;
   title: string;
   error: string;
+  /** The card as this dispatcher last wrote it; absent when the failure wrote nothing. */
+  card?: WorkboardCard;
 };
 
-type WorkboardDispatchAndStartResult = WorkboardDispatchResult & {
+export type WorkboardDispatchAndStartResult = WorkboardDispatchResult & {
   started: WorkboardStartedRun[];
   startFailures: WorkboardStartFailure[];
 };
@@ -454,6 +459,7 @@ async function runWorkboardDispatch(
             workspaceAccess: card.metadata?.automation?.workspaceAccess,
           },
           adoptWorkspaceAccess: persistWorkspaceAccess ? workspaceAccess : undefined,
+          ...(params.options?.startGate ? { startGate: params.options.startGate } : {}),
         },
       );
       claimValue = claimed.token;
@@ -496,6 +502,7 @@ async function runWorkboardDispatch(
         requestedSessionKey: sessionKey,
         now,
         scope: { ownerId, token: claimValue },
+        ...(params.options?.startGate ? { startGate: params.options.startGate } : {}),
       });
       const launched = prepared.card;
       preparedLaunch = prepared.launch;
@@ -551,7 +558,7 @@ async function runWorkboardDispatch(
         title: updated.title,
         sessionKey: acceptedSessionKey,
         runId: run.runId,
-        ...(directCardId ? { card: updated } : {}),
+        card: updated,
       });
       // A worker already accepted this run. Logging must never revoke its
       // claim, block live execution, or reopen the owner's capacity slot.
@@ -568,39 +575,66 @@ async function runWorkboardDispatch(
         )
         .catch(() => undefined);
     } catch (error) {
+      if (error instanceof WorkboardStartGateRefusedError) {
+        // A refused gate is an intentional stop: hand the card back untouched
+        // rather than blocking it, then end the pass without more starts.
+        if (claimValue) {
+          await params.store
+            .releaseClaim(card.id, { ownerId, token: claimValue, status: card.status })
+            .catch(() => undefined);
+          if (params.worktrees) {
+            const released = await params.store.get(card.id).catch(() => undefined);
+            if (released) {
+              await cleanupWorkboardCardWorktree({
+                store: params.store,
+                worktrees: params.worktrees,
+                card: released,
+                ...(workspaceMutation ? { workspaceMutation } : {}),
+              }).catch(() => undefined);
+            }
+          }
+        }
+        break;
+      }
       const message = formatErrorMessage(error);
-      startFailures.push({ cardId: card.id, title: card.title, error: message });
+      const failure: WorkboardStartFailure = { cardId: card.id, title: card.title, error: message };
+      startFailures.push(failure);
       if (!claimValue || runStarted) {
         continue;
       }
+      // Track the exact versions this dispatcher writes so callers can tell
+      // them apart from a concurrent operator repair of the same card.
+      let written: WorkboardCard | undefined;
       try {
         const reason = `Dispatcher could not start worker: ${message}`;
-        if (preparedLaunch) {
-          await params.store.failPreparedLaunch(card.id, {
-            expectedLaunch: preparedLaunch,
-            reason,
-            failedAt: Date.now(),
-          });
-        } else {
-          await params.store.block(
-            card.id,
-            { ownerId, token: claimValue, reason },
-            { ownerId, token: claimValue },
-          );
-        }
+        written = preparedLaunch
+          ? await params.store.failPreparedLaunch(card.id, {
+              expectedLaunch: preparedLaunch,
+              reason,
+              failedAt: Date.now(),
+            })
+          : await params.store.block(
+              card.id,
+              { ownerId, token: claimValue, reason },
+              { ownerId, token: claimValue },
+            );
       } catch {
         // Leave the original start failure visible; dispatch will diagnose stale claims later.
       }
       if (params.worktrees) {
-        const failedCard = await params.store.get(card.id).catch(() => undefined);
+        const failedCard = written ?? (await params.store.get(card.id).catch(() => undefined));
         if (failedCard) {
-          await cleanupWorkboardCardWorktree({
+          const cleaned = await cleanupWorkboardCardWorktree({
             store: params.store,
             worktrees: params.worktrees,
             card: failedCard,
             ...(workspaceMutation ? { workspaceMutation } : {}),
           }).catch(() => undefined);
+          written = cleaned ?? written;
         }
+      }
+      if (written) {
+        failure.card = written;
       }
     }
   }

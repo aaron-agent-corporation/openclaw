@@ -32,6 +32,37 @@
   height: 14px;
 }
 
+.workboard-auto-advance-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 8px;
+  cursor: pointer;
+}
+
+.workboard-auto-advance-toggle[aria-pressed="true"] {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.workboard-auto-advance-toggle svg {
+  width: 14px;
+  height: 14px;
+}
+
+.workboard-auto-advance-status {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.workboard-auto-advance-status__failure {
+  color: var(--danger);
+}
+
 .workboard-board-glyph--header {
   width: 28px;
   height: 28px;

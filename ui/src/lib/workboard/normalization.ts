@@ -20,6 +20,54 @@ function normalizeCount(value: unknown): number {
   return typeof value === "number" && Number.isFinite(value) && value >= 0 ? Math.trunc(value) : 0;
 }
 
+function normalizeBoardOrchestration(
+  value: unknown,
+): WorkboardBoardSummary["orchestration"] | undefined {
+  if (!isRecord(value)) {
+    return undefined;
+  }
+  const orchestration = {
+    ...(typeof value.autoDecompose === "boolean" ? { autoDecompose: value.autoDecompose } : {}),
+    ...(typeof value.autoAdvance === "boolean" ? { autoAdvance: value.autoAdvance } : {}),
+  };
+  return Object.keys(orchestration).length > 0 ? orchestration : undefined;
+}
+
+function normalizeOptionalText(value: unknown): string | undefined {
+  return typeof value === "string" && value.trim() ? value.trim() : undefined;
+}
+
+function normalizeBoardAutoAdvance(
+  value: unknown,
+): WorkboardBoardSummary["autoAdvance"] | undefined {
+  if (!isRecord(value) || typeof value.enabled !== "boolean") {
+    return undefined;
+  }
+  const idleReason = normalizeOptionalText(value.idleReason);
+  const failure = isRecord(value.lastFailure) ? value.lastFailure : undefined;
+  const failureError = normalizeOptionalText(failure?.error);
+  return {
+    enabled: value.enabled,
+    ...(typeof value.lastPassAt === "number" ? { lastPassAt: value.lastPassAt } : {}),
+    ...(idleReason ? { idleReason } : {}),
+    ...(failure && failureError && typeof failure.at === "number"
+      ? {
+          lastFailure: {
+            error: failureError,
+            at: failure.at,
+            ...(normalizeOptionalText(failure.cardId)
+              ? { cardId: normalizeOptionalText(failure.cardId) }
+              : {}),
+            ...(normalizeOptionalText(failure.title)
+              ? { title: normalizeOptionalText(failure.title) }
+              : {}),
+          },
+        }
+      : {}),
+    ...(typeof value.retryAt === "number" ? { retryAt: value.retryAt } : {}),
+  };
+}
+
 function normalizeBoardSummary(value: unknown): WorkboardBoardSummary | null {
   if (!isRecord(value)) {
     return null;
@@ -38,6 +86,8 @@ function normalizeBoardSummary(value: unknown): WorkboardBoardSummary | null {
   }
   const automationJobId =
     typeof value.automationJobId === "string" ? value.automationJobId.trim() : "";
+  const orchestration = normalizeBoardOrchestration(value.orchestration);
+  const autoAdvance = normalizeBoardAutoAdvance(value.autoAdvance);
   return {
     id,
     total: normalizeCount(value.total),
@@ -51,6 +101,8 @@ function normalizeBoardSummary(value: unknown): WorkboardBoardSummary | null {
     ...(typeof value.icon === "string" && value.icon.trim() ? { icon: value.icon.trim() } : {}),
     ...(typeof value.color === "string" && value.color.trim() ? { color: value.color.trim() } : {}),
     ...(automationJobId && automationJobId.length <= 128 ? { automationJobId } : {}),
+    ...(orchestration ? { orchestration } : {}),
+    ...(autoAdvance ? { autoAdvance } : {}),
     ...(typeof value.updatedAt === "number" ? { updatedAt: value.updatedAt } : {}),
     ...(typeof value.archivedAt === "number" ? { archivedAt: value.archivedAt } : {}),
   };

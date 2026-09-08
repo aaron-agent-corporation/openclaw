@@ -347,6 +347,64 @@ describe("WorkboardPage lifecycle", () => {
     expect(workboard.state.editingCardId).toBeNull();
   });
 
+  it("renders the auto-advance toggle and status, and toggles the board setting", async () => {
+    const setAutoAdvance = vi
+      .spyOn(workboardLib, "setWorkboardBoardAutoAdvance")
+      .mockResolvedValue(true);
+    const workboard = createWorkboardCapability();
+    workboard.state.boards = [
+      {
+        id: "planning",
+        total: 0,
+        active: 0,
+        archived: 0,
+        byStatus: {},
+        orchestration: { autoAdvance: true },
+        autoAdvance: {
+          enabled: true,
+          idleReason: "Waiting waits for main to finish Busy (running).",
+          lastFailure: { error: "provider outage", at: 5, title: "Fix" },
+        },
+      },
+    ];
+    const page = document.createElement("openclaw-workboard-page") as WorkboardPageTestElement;
+    const context = contextWithWorkboard(workboard);
+    page.context = context;
+    page.routeData = { boardFilter: "planning", search: "" };
+    document.body.append(page);
+    await page.updateComplete;
+
+    const toggle = page.querySelector<HTMLButtonElement>(".workboard-auto-advance-toggle");
+    expect(toggle?.getAttribute("aria-pressed")).toBe("true");
+    expect(toggle?.textContent?.trim()).toBe("Auto-advance on");
+    const status = page.querySelector(".workboard-auto-advance-status");
+    expect(status?.textContent).toContain("Waiting waits for main to finish Busy (running).");
+    expect(status?.textContent).toContain("Last start failure: Fix: provider outage");
+
+    toggle?.click();
+
+    expect(setAutoAdvance).toHaveBeenCalledWith(
+      expect.objectContaining({ host: workboard, boardId: "planning", enabled: false }),
+    );
+  });
+
+  it("hides the auto-advance status for manual boards and the toggle for read-only viewers", async () => {
+    const workboard = createWorkboardCapability();
+    workboard.state.boards = [{ id: "planning", total: 0, active: 0, archived: 0, byStatus: {} }];
+    const page = document.createElement("openclaw-workboard-page") as WorkboardPageTestElement;
+    const context = contextWithWorkboard(workboard);
+    context.gateway.snapshot.hello = {
+      auth: { role: "operator", scopes: ["operator.read"] },
+    } as never;
+    page.context = context;
+    page.routeData = { boardFilter: "planning", search: "" };
+    document.body.append(page);
+    await page.updateComplete;
+
+    expect(page.querySelector(".workboard-auto-advance-toggle")).toBeNull();
+    expect(page.querySelector(".workboard-auto-advance-status")).toBeNull();
+  });
+
   it.each([
     ["job-categorize-planning", true],
     [undefined, false],
