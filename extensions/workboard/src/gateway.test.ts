@@ -227,6 +227,20 @@ describe("workboard gateway methods", () => {
         }),
       ],
     });
+
+    // The page loader swaps the UI board catalog for the cards.list payload.
+    const respondCards = vi.fn();
+    await methods
+      .get("workboard.cards.list")
+      ?.handler({ params: {}, respond: respondCards } as never);
+    expect(respondCards.mock.calls[0]?.[1]).toMatchObject({
+      boards: expect.arrayContaining([
+        expect.objectContaining({
+          id: "ops",
+          autoAdvance: { enabled: true, idleReason: "No Ready cards are waiting." },
+        }),
+      ]),
+    });
   });
 
   it("applies connected client workspace access when accepting card paths", async () => {

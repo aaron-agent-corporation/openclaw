@@ -53,7 +53,12 @@ export function registerWorkboardGatewayMethods(params: {
       "workboard.cards.list",
       READ_SCOPE,
       async ({ params: requestParams }) =>
-        await listWorkboardCards(store, requestParams.boardId, redactClaimToken),
+        await listWorkboardCards(
+          store,
+          requestParams.boardId,
+          redactClaimToken,
+          autoAdvance?.describeBoards,
+        ),
     ],
   ]);
 
