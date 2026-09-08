@@ -363,6 +363,26 @@ describe("Workboard auto-advance", () => {
     await expect(store.get(child.id)).resolves.toMatchObject({ status: "running" });
   });
 
+  it("logs a no-start reason once, even when a productive pass first computed it", async () => {
+    const { store, service, logger } = await createHarness();
+    await enableBoard(store);
+    await createReadyCard(store, { title: "Running", agentId: "roscoe" });
+    await createReadyCard(store, { title: "Waiting", agentId: "roscoe" });
+    await service.settle();
+    expect(logger.info).not.toHaveBeenCalledWith(expect.stringContaining("idle ("));
+
+    service.onLifecycleSweep();
+    await service.settle();
+    service.onLifecycleSweep();
+    await service.settle();
+
+    const idleLogs = logger.info.mock.calls.filter(([line]) => String(line).includes("idle ("));
+    expect(idleLogs).toHaveLength(1);
+    expect(idleLogs[0]?.[0]).toContain("Waiting waits for roscoe to finish Running (running)");
+    const status = await boardStatus(service, store);
+    expect(status?.passStartedAt).toBeUndefined();
+  });
+
   it("starts the next card in the same lane after its worker is killed by a restart", async () => {
     const { store, service, run } = await createHarness();
     await enableBoard(store);

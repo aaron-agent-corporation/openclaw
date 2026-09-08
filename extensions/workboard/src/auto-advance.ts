@@ -64,6 +64,8 @@ type PendingBatch = {
 type BoardRuntimeState = Omit<WorkboardAutoAdvanceStatus, "enabled"> & {
   fingerprint?: string;
   consecutiveFailures: number;
+  /** Last no-start reason written to the log; productive passes do not count. */
+  loggedIdleReason?: string;
 };
 
 type AutoAdvanceLogger = Pick<
@@ -168,7 +170,12 @@ function boardStatus(
       idleReason: ready ? "Waiting for the first dispatch pass." : "Waiting for Gateway start.",
     };
   }
-  const { fingerprint: _fingerprint, consecutiveFailures: _failures, ...status } = state;
+  const {
+    fingerprint: _fingerprint,
+    consecutiveFailures: _failures,
+    loggedIdleReason: _logged,
+    ...status
+  } = state;
   return { enabled: true, ...status };
 }
 
@@ -239,9 +246,14 @@ export function createWorkboardAutoAdvanceService(params: {
       board !== undefined &&
       workboardBoardAutoAdvanceEnabled(board);
     let result: WorkboardDispatchAndStartResult;
+    state.passStartedAt = passAt;
     try {
       result = await params.dispatch({ boardId, now: passAt, startGate });
     } catch (error) {
+      // Only the pass that set the marker may clear it; a newer pass may own it now.
+      if (state.passStartedAt === passAt) {
+        state.passStartedAt = undefined;
+      }
       const message = formatErrorMessage(error);
       // Keep the pre-pass fingerprint so an unchanged board stays in backoff.
       state.fingerprint = fingerprint;
@@ -253,6 +265,9 @@ export function createWorkboardAutoAdvanceService(params: {
       state.retryAt = passAt + retryDelay(state.consecutiveFailures);
       logger?.warn(`workboard auto-advance pass failed for board ${boardId}: ${message}`);
       return;
+    }
+    if (state.passStartedAt === passAt) {
+      state.passStartedAt = undefined;
     }
     if (generation !== owner) {
       return;
@@ -270,11 +285,18 @@ export function createWorkboardAutoAdvanceService(params: {
     }
     state.lastPassAt = passAt;
     state.lastTrigger = trigger;
-    state.idleReason = describeWorkboardIdleReason({
+    const idleReason = describeWorkboardIdleReason({
       cards: after,
       failures: result.startFailures,
       now: passAt,
     });
+    if (result.started.length === 0 && idleReason !== state.loggedIdleReason) {
+      // Operators read the Gateway log when the board looks stuck; record each
+      // new no-start reason once rather than on every 60s sweep.
+      logger?.info(`workboard auto-advance idle (${trigger}) on board ${boardId}: ${idleReason}`);
+      state.loggedIdleReason = idleReason;
+    }
+    state.idleReason = idleReason;
     const firstStart = result.started[0];
     const firstFailure = result.startFailures[0];
     if (firstFailure) {
@@ -387,6 +409,7 @@ export function createWorkboardAutoAdvanceService(params: {
     start(ctx) {
       logger = ctx.logger;
       started = true;
+      logger.info("workboard auto-advance service started; passes begin after the lifecycle sweep");
       unsubscribe?.();
       unsubscribe = params.store.subscribeChanges(() => request({ trigger: "change" }));
     },
@@ -409,6 +432,9 @@ export function createWorkboardAutoAdvanceService(params: {
       // reconciled prepared launches and live sessions after (re)start, so a
       // change event during startup cannot dispatch against stale worker state.
       const trigger = hasSwept ? "sweep" : "gateway-start";
+      if (!hasSwept) {
+        logger?.info("workboard auto-advance ready: first lifecycle sweep reconciled");
+      }
       hasSwept = true;
       ready = true;
       request({ trigger });

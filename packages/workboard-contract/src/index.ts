@@ -339,6 +339,8 @@ export type WorkboardAutoAdvanceTrigger =
 // `enabled` mirrors persisted board intent; the rest is runtime diagnostic state.
 export type WorkboardAutoAdvanceStatus = {
   enabled: boolean;
+  /** Set while a dispatch pass is running; a long-lived value means the launch path is stuck. */
+  passStartedAt?: number;
   lastPassAt?: number;
   lastTrigger?: WorkboardAutoAdvanceTrigger;
   idleReason?: string;
