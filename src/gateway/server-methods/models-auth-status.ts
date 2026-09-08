@@ -14,13 +14,18 @@ import {
 } from "../../agents/auth-health.js";
 import {
   type AuthProfileStore,
+  CLAUDE_CLI_PROFILE_ID,
+  CODEX_CLI_PROFILE_ID,
   ensureAuthProfileStoreWithoutExternalProfiles,
   externalCliDiscoveryForConfigStatus,
+  indexAgentAuthProfilePins,
   listProfilesForProvider,
   removeAuthProfilesAcrossOwnerStores,
   removeProviderAuthProfilesWithLock,
+  resolveAuthProfileDisplayLabel,
   resolvePersistedAuthProfileOwnerAgentDir,
 } from "../../agents/auth-profiles.js";
+import { resolveAuthProfileMetadata } from "../../agents/auth-profiles/identity.js";
 import { getRuntimeExternalCliProfileIds } from "../../agents/auth-profiles/runtime-external-profile-references.js";
 import {
   isNonSecretApiKeyMarker,
@@ -283,6 +288,9 @@ function mapProvider(
   logoutProfileIds: ReadonlySet<string>,
   configBoundProfileIds: ReadonlySet<string>,
   externalCliProfileIds: ReadonlySet<string>,
+  cfg: OpenClawConfig,
+  store: AuthProfileStore,
+  agentPinsByProfile: ReadonlyMap<string, string[]>,
 ): ModelAuthStatusProvider {
   const usageProfile =
     prov.profiles.find((profile) => profile.type === "oauth" || profile.type === "token") ??
@@ -322,18 +330,34 @@ function mapProvider(
     status:
       apiKey && !hasRefreshableProfile && rollup.status === "missing" ? "static" : rollup.status,
     expiry: buildExpiry(rollup.remainingMs, rollup.expiresAt),
-    profiles: prov.profiles.map((prof) => ({
-      profileId: prof.profileId,
-      type: prof.type,
-      status: prof.status,
-      reasonCode: prof.reasonCode,
-      expiry: buildExpiry(prof.remainingMs, prof.expiresAt),
-      ...((prof.type === "oauth" || prof.type === "token") &&
-      logoutProfileIds.has(prof.profileId) &&
-      !configBoundProfileIds.has(prof.profileId)
-        ? { logoutSupported: true }
-        : {}),
-    })),
+    profiles: prov.profiles.map((prof) => {
+      const metadata = resolveAuthProfileMetadata({
+        cfg,
+        store,
+        profileId: prof.profileId,
+      });
+      const pinnedByAgentIds = agentPinsByProfile.get(prof.profileId);
+      const cliSubscription =
+        externalCliProfileIds.has(prof.profileId) ||
+        prof.profileId === CLAUDE_CLI_PROFILE_ID ||
+        prof.profileId === CODEX_CLI_PROFILE_ID;
+      return {
+        profileId: prof.profileId,
+        type: prof.type,
+        status: prof.status,
+        reasonCode: prof.reasonCode,
+        expiry: buildExpiry(prof.remainingMs, prof.expiresAt),
+        label: resolveAuthProfileDisplayLabel({ cfg, store, profileId: prof.profileId }),
+        ...(metadata.email ? { email: metadata.email } : {}),
+        ...(pinnedByAgentIds?.length ? { pinnedByAgentIds } : {}),
+        ...(cliSubscription ? { cliSubscription: true } : {}),
+        ...((prof.type === "oauth" || prof.type === "token") &&
+        logoutProfileIds.has(prof.profileId) &&
+        !configBoundProfileIds.has(prof.profileId)
+          ? { logoutSupported: true }
+          : {}),
+      };
+    }),
     ...(apiKey ? { apiKey } : {}),
     usage:
       usage && usageKey
@@ -654,6 +678,7 @@ export const modelsAuthStatusHandlers: GatewayRequestHandlers = {
           .map(([profileId]) => profileId),
       );
       const configBoundProfileIds = resolveConfigBoundProfileIds(cfg, store, authAliasLookupParams);
+      const agentPinsByProfile = indexAgentAuthProfilePins(cfg);
       const providers = authHealth.providers.map((prov) =>
         mapProvider(
           prov,
@@ -663,6 +688,9 @@ export const modelsAuthStatusHandlers: GatewayRequestHandlers = {
           logoutProfileIds,
           configBoundProfileIds,
           externalCliProfileIds,
+          cfg,
+          store,
+          agentPinsByProfile,
         ),
       );
       const providerCapabilities = buildProviderCapabilities({

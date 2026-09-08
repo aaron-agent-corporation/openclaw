@@ -169,12 +169,46 @@ function renderCredentialSummary(card: ModelProviderCard, agentLabel: string) {
   } else if (apiProfileCount > 0) {
     parts.push(t("modelProviders.credentials.profileKey", { count: String(apiProfileCount) }));
   }
+  const profileRows =
+    card.profiles.length > 0
+      ? html`
+          <div class="model-providers__profile-list">
+            <div class="model-providers__profile-heading">
+              ${t("modelProviders.credentials.profilesHeading")}
+            </div>
+            ${card.profiles.map((profile) => {
+              const label = profile.label ?? profile.profileId;
+              const pinned =
+                profile.pinnedByAgentIds && profile.pinnedByAgentIds.length > 0
+                  ? t("modelProviders.credentials.pinnedBy", {
+                      agents: profile.pinnedByAgentIds.join(", "),
+                    })
+                  : null;
+              return html`
+                <div class="model-providers__profile-row">
+                  <strong>${label}</strong>
+                  <span>${profile.type} · ${profile.status}</span>
+                  ${profile.cliSubscription
+                    ? html`<span class="chip"
+                        >${t("modelProviders.credentials.cliSubscription")}</span
+                      >`
+                    : nothing}
+                  ${pinned ? html`<span>${pinned}</span>` : nothing}
+                </div>
+              `;
+            })}
+          </div>
+        `
+      : html`<div class="model-providers__profile-list">
+          ${t("modelProviders.credentials.noNamedProfiles")}
+        </div>`;
   return html`
     <div class="model-providers__credentials">
       <span>${t("modelProviders.credentials.label", { agent: agentLabel })}</span>
       <strong
         >${parts.length > 0 ? parts.join(" · ") : t("modelProviders.credentials.none")}</strong
       >
+      ${profileRows}
     </div>
   `;
 }

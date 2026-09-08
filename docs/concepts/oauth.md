@@ -212,8 +212,28 @@ Then configure auth per-agent (wizard) and route chats to the right agent.
 The auth profile store supports multiple profile IDs for the same provider.
 Pick which one is used:
 
+- per agent via `agents.entries.<id>.auth.profiles` (provider → profile id)
 - globally via config ordering (`auth.order`)
 - per-session via `/model ...@<profileId> -s`
+
+Example (agent pin):
+
+```json5
+{
+  agents: {
+    entries: {
+      researcher: {
+        auth: {
+          profiles: {
+            openai: "openai:household",
+            anthropic: "anthropic:work",
+          },
+        },
+      },
+    },
+  },
+}
+```
 
 Example (session override):
 
@@ -229,6 +249,7 @@ Related docs:
 
 - [Model failover](/concepts/model-failover) (rotation + cooldown rules)
 - [Slash commands](/tools/slash-commands) (command surface)
+- [Auth credential semantics](/auth-credential-semantics) (pin precedence)
 
 ## Related
 

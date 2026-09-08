@@ -1,0 +1,9 @@
+# Thin overlay: ship subscription-pinning changes on the official browser image.
+# Full multi-stage rebuild needs more Docker Desktop RAM than this machine has.
+FROM docker.io/openclaw/openclaw:2026.9.1-browser
+
+USER root
+COPY dist/ /app/dist/
+COPY openclaw.mjs /app/openclaw.mjs
+COPY package.json /app/package.json
+USER node

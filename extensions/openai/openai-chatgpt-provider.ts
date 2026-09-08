@@ -39,6 +39,7 @@ import {
   OPENAI_GPT_54_PRO_MODEL_ID as OPENAI_CODEX_GPT_54_PRO_MODEL_ID,
   OPENAI_GPT_55_MODEL_ID as OPENAI_CODEX_GPT_55_MODEL_ID,
   OPENAI_GPT_55_PRO_MODEL_ID as OPENAI_CODEX_GPT_55_PRO_MODEL_ID,
+  OPENAI_GPT_6_ASTRA_MODEL_ID as OPENAI_CODEX_GPT_6_ASTRA_MODEL_ID,
   OPENAI_GPT_56_VARIANT_MODEL_IDS as OPENAI_CODEX_GPT_56_MODEL_IDS,
 } from "./model-route-contract.js";
 import {
@@ -60,6 +61,7 @@ const OPENAI_CODEX_GPT_56_THINKING_LEVEL_MAP = {
   max: "max",
 } as const;
 const OPENAI_CODEX_GPT_56_NATIVE_CONTEXT_TOKENS = 372_000;
+const OPENAI_CODEX_GPT_6_ASTRA_NATIVE_CONTEXT_TOKENS = 872_000;
 const OPENAI_CODEX_GPT_55_CODEX_CONTEXT_TOKENS = 400_000;
 const OPENAI_CODEX_GPT_55_PRO_NATIVE_CONTEXT_TOKENS = 1_000_000;
 const OPENAI_CODEX_GPT_54_NATIVE_CONTEXT_TOKENS = 1_050_000;
@@ -102,6 +104,7 @@ const OPENAI_CODEX_GPT_55_PRO_TEMPLATE_MODEL_IDS = [
   ...OPENAI_CODEX_GPT_54_TEMPLATE_MODEL_IDS,
 ] as const;
 const OPENAI_CODEX_IMAGE_CAPABLE_MODEL_IDS = [
+  OPENAI_CODEX_GPT_6_ASTRA_MODEL_ID,
   ...OPENAI_CODEX_GPT_56_MODEL_IDS,
   OPENAI_CODEX_GPT_55_MODEL_ID,
   OPENAI_CODEX_GPT_55_PRO_MODEL_ID,
@@ -219,13 +222,20 @@ function resolveCodexForwardCompatModel(ctx: ProviderResolveDynamicModelContext)
   const lower = normalizeLowercaseStringOrEmpty(trimmedModelId);
   const synthBaseUrl = ctx.providerConfig?.baseUrl ?? OPENAI_CODEX_BASE_URL;
 
-  if (OPENAI_CODEX_GPT_56_MODEL_IDS.some((modelId) => modelId === lower)) {
+  if (
+    lower === OPENAI_CODEX_GPT_6_ASTRA_MODEL_ID ||
+    OPENAI_CODEX_GPT_56_MODEL_IDS.some((modelId) => modelId === lower)
+  ) {
+    const contextWindow =
+      lower === OPENAI_CODEX_GPT_6_ASTRA_MODEL_ID
+        ? OPENAI_CODEX_GPT_6_ASTRA_NATIVE_CONTEXT_TOKENS
+        : OPENAI_CODEX_GPT_56_NATIVE_CONTEXT_TOKENS;
     const model = ctx.modelRegistry.find(PROVIDER_ID, trimmedModelId) as
       | ProviderRuntimeModel
       | undefined;
     const registeredModel = withDefaultCodexContextMetadata({
       model: withCodexTransport(model, synthBaseUrl),
-      contextWindow: OPENAI_CODEX_GPT_56_NATIVE_CONTEXT_TOKENS,
+      contextWindow,
       contextTokens: OPENAI_DEFAULT_RUNTIME_CONTEXT_TOKENS,
     });
     if (registeredModel) {
@@ -246,7 +256,7 @@ function resolveCodexForwardCompatModel(ctx: ProviderResolveDynamicModelContext)
       reasoning: true,
       input: ["text", "image"],
       cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
-      contextWindow: OPENAI_CODEX_GPT_56_NATIVE_CONTEXT_TOKENS,
+      contextWindow,
       contextTokens: OPENAI_DEFAULT_RUNTIME_CONTEXT_TOKENS,
       maxTokens: OPENAI_CODEX_GPT_54_MAX_TOKENS,
       thinkingLevelMap: OPENAI_CODEX_GPT_56_THINKING_LEVEL_MAP,

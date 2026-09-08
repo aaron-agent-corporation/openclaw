@@ -92,6 +92,8 @@ describe("OpenAI provider policy artifact", () => {
   });
 
   it.each([
+    ["gpt-6-astra", "codex", "low"],
+    ["gpt-6-astra", "openclaw", "low"],
     ["gpt-5.6-sol", "codex", "medium"],
     ["gpt-5.6-sol", "openclaw", "medium"],
     ["gpt-5.6-terra", "codex", "medium"],
@@ -108,7 +110,7 @@ describe("OpenAI provider policy artifact", () => {
     expect(profile?.defaultLevel).toBe(expected);
   });
 
-  it.each(["gpt-5.6", "gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna"])(
+  it.each(["gpt-6-astra", "gpt-5.6", "gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna"])(
     "exposes logical Ultra for %s on the OpenClaw runtime",
     (modelId) => {
       const levels = resolveThinkingProfile({
@@ -121,7 +123,7 @@ describe("OpenAI provider policy artifact", () => {
     },
   );
 
-  it.each(["gpt-5.6-sol", "gpt-5.6-terra"])(
+  it.each(["gpt-6-astra", "gpt-5.6-sol", "gpt-5.6-terra"])(
     "uses native Ultra fallback for %s when model/list metadata is unavailable",
     (modelId) => {
       const levels = resolveThinkingProfile({

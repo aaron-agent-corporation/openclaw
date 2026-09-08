@@ -919,6 +919,12 @@ export const AgentModelPolicySchema = z
   })
   .strict();
 
+export const AgentAuthSchema = z
+  .object({
+    profiles: z.record(z.string(), z.string().min(1)).optional(),
+  })
+  .strict();
+
 export const AgentEntrySchema = z
   .object({
     id: z.string(),
@@ -927,6 +933,7 @@ export const AgentEntrySchema = z
     workspace: z.string().optional(),
     cwd: z.string().optional(),
     agentDir: z.string().optional(),
+    auth: AgentAuthSchema.optional(),
     model: AgentModelSchema.optional(),
     utilityModel: z.string().optional(),
     models: AgentModelMapSchema.optional(),

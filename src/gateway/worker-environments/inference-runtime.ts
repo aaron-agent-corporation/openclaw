@@ -13,6 +13,7 @@ import {
   resolveAgentWorkspaceDir,
   resolveDefaultAgentId,
 } from "../../agents/agent-scope.js";
+import { resolveConfiguredAuthProfileId } from "../../agents/auth-profiles/agent-configured-profile.js";
 import { resolveSessionAuthSelection } from "../../agents/auth-profiles/session-override.js";
 import { applyExtraParamsToAgent } from "../../agents/embedded-agent-runner/extra-params.js";
 import { resolveModelAsync } from "../../agents/embedded-agent-runner/model.js";
@@ -429,13 +430,17 @@ async function resolveApprovedModel(params: {
         runtimeLease.release();
         return undefined;
       }
-      const configuredDefaultProfile =
+      const isAgentDefaultModel =
         resolvedKey ===
-        modelCatalogLogicalKey({ provider: defaultModel.provider, id: defaultModel.model })
-          ? splitTrailingAuthProfile(
-              resolveAgentEffectiveModelPrimary(lifecycleConfig, target.agentId) ?? "",
-            ).profile
-          : undefined;
+        modelCatalogLogicalKey({ provider: defaultModel.provider, id: defaultModel.model });
+      const configuredDefaultProfile = resolveConfiguredAuthProfileId({
+        cfg: lifecycleConfig,
+        agentId: target.agentId,
+        provider: resolved.ref.provider,
+        modelId: isAgentDefaultModel
+          ? resolveAgentEffectiveModelPrimary(lifecycleConfig, target.agentId)
+          : undefined,
+      });
       const harnessPolicy = resolveAgentHarnessPolicy({
         provider: resolved.ref.provider,
         modelId: resolved.ref.model,

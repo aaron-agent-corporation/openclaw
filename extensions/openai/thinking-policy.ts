@@ -13,6 +13,7 @@ import {
   OPENAI_GPT_55_MODEL_ID,
   OPENAI_GPT_55_PRO_MODEL_ID,
   OPENAI_GPT_56_MODEL_ID,
+  OPENAI_GPT_6_ASTRA_MODEL_ID,
   resolveOpenAICodexReasoningEfforts,
 } from "./model-route-contract.js";
 
@@ -40,6 +41,7 @@ const OPENAI_THINKING_LEVEL_ORDER = [
 type OpenAIThinkingLevelId = (typeof OPENAI_THINKING_LEVEL_ORDER)[number];
 
 const OPENAI_CODEX_XHIGH_MODEL_IDS = [
+  OPENAI_GPT_6_ASTRA_MODEL_ID,
   OPENAI_GPT_56_MODEL_ID,
   OPENAI_GPT_55_MODEL_ID,
   OPENAI_GPT_55_PRO_MODEL_ID,
@@ -98,15 +100,17 @@ function buildOpenAIThinkingProfile(params: {
       ? resolveOpenAICodexReasoningEfforts(modelId, codexEfforts)
       : undefined;
   const knownCodexEfforts = resolveOpenAICodexReasoningEfforts(modelId, undefined);
-  const isGpt56Variant = knownCodexEfforts !== undefined;
+  const isKnownCodexReasoningModel = knownCodexEfforts !== undefined;
+  const isGpt6Astra = modelId === OPENAI_GPT_6_ASTRA_MODEL_ID;
   const codexSupportsMax = (resolvedCodexEfforts ?? knownCodexEfforts)?.includes("max");
   const supportsMax =
-    modelId.startsWith("gpt-5.6") && (agentRuntime !== "codex" || codexSupportsMax);
+    (modelId.startsWith("gpt-5.6") || isGpt6Astra) &&
+    (agentRuntime !== "codex" || codexSupportsMax);
   const codexSupportsUltra = (resolvedCodexEfforts ?? knownCodexEfforts)?.includes("ultra");
   // OpenClaw owns its logical Ultra orchestration. Native Codex capabilities
   // come from native discovery or the selected ChatGPT route's catalog metadata.
   const supportsUltra =
-    (modelId === OPENAI_GPT_56_MODEL_ID || isGpt56Variant) &&
+    (modelId === OPENAI_GPT_56_MODEL_ID || isKnownCodexReasoningModel) &&
     (agentRuntime === "openclaw" ||
       agentRuntime === "auto" ||
       (agentRuntime === "codex" && codexSupportsUltra));
@@ -116,7 +120,7 @@ function buildOpenAIThinkingProfile(params: {
     (params.api === undefined || params.api === "openai-chatgpt-responses") &&
     !matchesExactOrPrefix(params.modelId, params.xhighModelIds) &&
     !modelId.startsWith("gpt-5.6");
-  const defaultLevel = isGpt56Variant ? "medium" : undefined;
+  const defaultLevel = isGpt6Astra ? "low" : isKnownCodexReasoningModel ? "medium" : undefined;
   const fallbackLevels: ProviderThinkingProfile["levels"] = [
     ...OPENAI_THINKING_BASE_LEVELS,
     ...(matchesExactOrPrefix(params.modelId, params.xhighModelIds)

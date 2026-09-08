@@ -534,10 +534,22 @@
 .chat-composer-model-control {
   display: inline-flex;
   flex: 0 1 auto;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
   min-width: 0;
   max-width: 100%;
   margin-left: auto;
   order: 3;
+}
+
+.chat-composer-auth-profile {
+  color: var(--muted);
+  font-size: 11px;
+  white-space: nowrap;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .chat-composer-model-control .chat-controls__model {

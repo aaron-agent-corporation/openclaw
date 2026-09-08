@@ -9,8 +9,10 @@ import type {
   ChannelsStatusSnapshot,
   CronJob,
   CronStatus,
+  ModelAuthStatusResult,
   ModelCatalogEntry,
   SkillStatusReport,
+  SystemAgentSetupDetectResult,
   ToolsCatalogResult,
   ToolsEffectiveResult,
 } from "../../api/types.ts";
@@ -32,6 +34,7 @@ import "../../styles/agents.css";
 import "../../styles/sidebar-markdown.css";
 import "./memory/memory-panel.ts";
 import type { AgentsPanel } from "../../lib/agents/index.ts";
+import type { AgentAuthPinDraft } from "./auth-pins.ts";
 import type { AgentIdentityDraft } from "./panels-overview.ts";
 import { renderAgentOverview } from "./panels-overview.ts";
 import { renderAgentFiles, renderAgentChannels, renderAgentCron } from "./panels-status-files.ts";
@@ -129,6 +132,14 @@ type AgentsProps = {
   runtimeSessionMatchesSelectedAgent: boolean;
   modelCatalog: ModelCatalogEntry[];
   modelCatalogError: string | null;
+  authStatus: ModelAuthStatusResult | null;
+  authStatusError: string | null;
+  authPinDrafts: readonly AgentAuthPinDraft[];
+  subscriptionPanel: "closed" | "pick" | "api-key";
+  setupDetect: SystemAgentSetupDetectResult | null;
+  apiKeyProviderId: string;
+  apiKeyValue: string;
+  subscriptionBusy: boolean;
   pinnedAgentIds: readonly string[];
   onTogglePinnedAgent: (agentId: string) => void;
   onRefresh: () => void;
@@ -149,6 +160,16 @@ type AgentsProps = {
   onIdentitySave: () => void;
   onModelChange: (agentId: string, modelId: string | null) => void;
   onModelFallbacksChange: (agentId: string, fallbacks: string[]) => void;
+  onAuthProfilesChange: (agentId: string, profiles: Record<string, string>) => void;
+  onAuthPinDraftsChange: (drafts: AgentAuthPinDraft[]) => void;
+  onOpenSubscriptionPanel: () => void;
+  onCloseSubscriptionPanel: () => void;
+  onStartAuthSubscription: (authChoiceId: string, providerHint?: string | null) => void;
+  onShowApiKeyForm: () => void;
+  onApiKeyProviderChange: (providerId: string) => void;
+  onApiKeyValueChange: (value: string) => void;
+  onSaveApiKeySubscription: () => void;
+  onAuthStatusRetry: () => void;
   onModelCatalogRetry: () => void;
   onChannelsRefresh: () => void;
   onOpenMemoryImport?: () => void;
@@ -366,6 +387,14 @@ export function renderAgents(props: AgentsProps) {
                         configDirty: props.config.dirty,
                         modelCatalog: props.modelCatalog,
                         modelCatalogError: props.modelCatalogError,
+                        authStatus: props.authStatus,
+                        authStatusError: props.authStatusError,
+                        authPinDrafts: props.authPinDrafts,
+                        subscriptionPanel: props.subscriptionPanel,
+                        setupDetect: props.setupDetect,
+                        apiKeyProviderId: props.apiKeyProviderId,
+                        apiKeyValue: props.apiKeyValue,
+                        subscriptionBusy: props.subscriptionBusy,
                         onConfigReload: props.onConfigReload,
                         onConfigSave: props.onConfigSave,
                         onIdentityFieldChange: props.onIdentityFieldChange,
@@ -373,6 +402,16 @@ export function renderAgents(props: AgentsProps) {
                         onIdentitySave: props.onIdentitySave,
                         onModelChange: props.onModelChange,
                         onModelFallbacksChange: props.onModelFallbacksChange,
+                        onAuthProfilesChange: props.onAuthProfilesChange,
+                        onAuthPinDraftsChange: props.onAuthPinDraftsChange,
+                        onOpenSubscriptionPanel: props.onOpenSubscriptionPanel,
+                        onCloseSubscriptionPanel: props.onCloseSubscriptionPanel,
+                        onStartAuthSubscription: props.onStartAuthSubscription,
+                        onShowApiKeyForm: props.onShowApiKeyForm,
+                        onApiKeyProviderChange: props.onApiKeyProviderChange,
+                        onApiKeyValueChange: props.onApiKeyValueChange,
+                        onSaveApiKeySubscription: props.onSaveApiKeySubscription,
+                        onAuthStatusRetry: props.onAuthStatusRetry,
                         onModelCatalogRetry: props.onModelCatalogRetry,
                         onSelectPanel: props.onSelectPanel,
                       }),

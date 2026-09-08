@@ -155,9 +155,14 @@ describe("OpenAI provider Codex transport hooks", () => {
     });
   });
 
-  it.each(["gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna"])(
-    "resolves %s through the Codex Responses transport without live catalog metadata",
-    (modelId) => {
+  it.each([
+    { modelId: "gpt-6-astra", contextWindow: 872_000 },
+    { modelId: "gpt-5.6-sol", contextWindow: 372_000 },
+    { modelId: "gpt-5.6-terra", contextWindow: 372_000 },
+    { modelId: "gpt-5.6-luna", contextWindow: 372_000 },
+  ])(
+    "resolves $modelId through the Codex Responses transport without live catalog metadata",
+    ({ modelId, contextWindow }) => {
       const provider = buildOpenAIProvider();
 
       const model = provider.resolveDynamicModel?.({
@@ -174,7 +179,7 @@ describe("OpenAI provider Codex transport hooks", () => {
         api: "openai-chatgpt-responses",
         baseUrl: "https://chatgpt.com/backend-api/codex",
         input: ["text", "image"],
-        contextWindow: 372_000,
+        contextWindow,
         contextTokens: 272_000,
         maxTokens: 128_000,
         thinkingLevelMap: { off: null, xhigh: "xhigh", max: "max" },

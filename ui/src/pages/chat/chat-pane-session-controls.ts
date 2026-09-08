@@ -1,4 +1,4 @@
-import { html } from "lit";
+import { html, nothing } from "lit";
 import type { GatewaySessionRow } from "../../api/types.ts";
 import type { ApplicationGatewaySnapshot } from "../../app/gateway.ts";
 import { t } from "../../i18n/index.ts";
@@ -203,6 +203,15 @@ export function renderChatPaneComposerControls(params: {
               ? switchChatThinkingLevel(state, next, targetSessionKey)
               : Promise.resolve(false),
         })}
+        ${selectedSession?.authProfileLabel || selectedSession?.authProfileId
+          ? html`<span
+              class="chat-composer-auth-profile"
+              title=${selectedSession.authProfileId ?? ""}
+              >${t("sessionsView.usingAuthProfile", {
+                label: selectedSession.authProfileLabel ?? selectedSession.authProfileId ?? "",
+              })}</span
+            >`
+          : nothing}
       </div>
     `,
     permissionPicker: {

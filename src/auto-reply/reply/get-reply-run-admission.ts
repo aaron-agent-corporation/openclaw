@@ -2,6 +2,7 @@ import crypto from "node:crypto";
 import path from "node:path";
 import { normalizeOptionalString } from "@openclaw/normalization-core/string-coerce";
 import { clearAutoFallbackPrimaryProbeSelection } from "../../agents/agent-scope.js";
+import { resolveConfiguredAuthProfileId } from "../../agents/auth-profiles/agent-configured-profile.js";
 import { resolveSessionAuthSelection } from "../../agents/auth-profiles/session-override.js";
 import { resolveAgentHarnessPolicy } from "../../agents/harness/policy.js";
 import { MAIN_SESSION_RECOVERY_WORK_ADMISSION_OWNER } from "../../agents/main-session-recovery/main-session-recovery-admission.js";
@@ -433,10 +434,17 @@ export async function prepareReplyRunAdmission(context: PreparedReplyRunContext)
       shouldUseEphemeralSession && authSessionEntry
         ? { [authSessionKey]: authSessionEntry }
         : sessionStore;
+    const configuredProfileId = resolveConfiguredAuthProfileId({
+      cfg,
+      agentId,
+      provider,
+      modelId: model,
+    });
     const selection = await resolveSessionAuthSelection({
       cfg,
       provider,
       modelId: model,
+      ...(configuredProfileId ? { configuredProfileId } : {}),
       ...(agentHarnessPolicy ? { harnessRuntime: agentHarnessPolicy.runtime } : {}),
       agentDir,
       sessionEntry: authSessionEntry,

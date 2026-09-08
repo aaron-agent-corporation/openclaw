@@ -109,7 +109,7 @@ Official provider plugins publish their own model catalog rows. These providers 
 - Auth: `OPENAI_API_KEY`
 - Optional rotation: `OPENAI_API_KEYS`, `OPENAI_API_KEY_1`, `OPENAI_API_KEY_2`, plus `OPENCLAW_LIVE_OPENAI_KEY` (single override)
 - Fresh setup default: `openai/gpt-5.6-sol`.
-- Example models: `openai/gpt-5.6-sol`, `openai/gpt-5.6-terra`, `openai/gpt-5.6-luna`, `openai/gpt-5.5`; the bare direct-API `openai/gpt-5.6` alias remains supported.
+- Example models: `openai/gpt-6-astra`, `openai/gpt-5.6-sol`, `openai/gpt-5.6-terra`, `openai/gpt-5.6-luna`, `openai/gpt-5.5`; the bare direct-API `openai/gpt-5.6` alias remains supported.
 - Verify account/model availability with `openclaw models list --provider openai` if a specific install or API key behaves differently.
 - CLI: `openclaw onboard --auth-choice openai-api-key`
 - Direct OpenAI API-key Responses requests default to `"sse"`.
@@ -170,7 +170,7 @@ Claude CLI reuse (`claude -p`) is a sanctioned OpenClaw integration path. Anthro
 - Hidden OpenClaw attribution headers (`originator`, `version`, `User-Agent`) are only attached on native Codex traffic to `chatgpt.com/backend-api`, not generic OpenAI-compatible proxies
 - The shared `/fast` toggle, configured defaults, and valid model-scoped Fast params resolve through one runtime-control policy. See [Thinking levels](/tools/thinking#fast-mode-%2Ffast) for precedence.
 - OpenAI API Fast mode is premium-priced and model-specific. GPT-5.6 Sol currently costs 2× Standard token pricing, and long-context multipliers stack. ChatGPT/Codex-credit Fast mode is separate: GPT-5.6 and GPT-5.5 currently consume 2.5× Standard credits, while API-key Codex runs use API token pricing. See [Fast mode](https://openai.com/api-priority-processing/), [API pricing](https://developers.openai.com/api/docs/pricing), and [Codex speed](https://learn.chatgpt.com/docs/agent-configuration/speed).
-- The native Codex catalog can expose exact `openai/gpt-5.6-sol`, `openai/gpt-5.6-terra`, and `openai/gpt-5.6-luna` refs according to account access. It does not apply the direct API's bare `gpt-5.6` alias client-side.
+- The native Codex catalog can expose exact `openai/gpt-6-astra`, `openai/gpt-5.6-sol`, `openai/gpt-5.6-terra`, and `openai/gpt-5.6-luna` refs according to account access. It does not apply the direct API's bare `gpt-5.6` alias client-side.
 - `openai/gpt-5.5` uses the Codex catalog native `contextWindow = 400000` and default runtime `contextTokens = 272000`; override the runtime cap with `models.providers.openai.models[].contextTokens`
 - Sign in with `openai` auth and use `openai/gpt-5.6-sol` for a fresh subscription-backed setup. Select `openai/gpt-5.5` explicitly if that Codex workspace does not expose GPT-5.6.
 - Use provider/model `agentRuntime.id: "openclaw"` to keep an otherwise eligible route on the built-in runtime. With runtime unset or `auto`, only an exact official HTTPS Responses/ChatGPT-compatible route with no authored provider request override may select Codex implicitly.

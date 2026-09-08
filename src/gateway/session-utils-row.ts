@@ -1,6 +1,8 @@
 import { createHash } from "node:crypto";
 import { asNonNegativeFiniteNumber } from "@openclaw/normalization-core/number-coercion";
 import { normalizeOptionalString } from "@openclaw/normalization-core/string-coerce";
+import { resolveConfiguredAuthProfileId } from "../agents/auth-profiles/agent-configured-profile.js";
+import { resolveAuthProfileMetadata } from "../agents/auth-profiles/identity.js";
 import { resolveAuthoredModelContextTokens } from "../agents/context-resolution.js";
 import { resolveContextTokensForModel } from "../agents/context.js";
 import { DEFAULT_MODEL, DEFAULT_PROVIDER } from "../agents/defaults.js";
@@ -542,6 +544,28 @@ export function buildGatewaySessionRow(params: {
     }).mode,
     modelProvider: rowModelProvider,
     model: rowModel,
+    ...(() => {
+      const pinned =
+        normalizeOptionalString(entry?.authProfileOverride) ??
+        (rowModelProvider
+          ? resolveConfiguredAuthProfileId({
+              cfg,
+              agentId: sessionAgentId,
+              provider: rowModelProvider,
+              modelId: rowModel ? `${rowModelProvider}/${rowModel}` : undefined,
+            })
+          : undefined);
+      if (!pinned) {
+        return {};
+      }
+      const metadata = resolveAuthProfileMetadata({ cfg, profileId: pinned });
+      const label = metadata.displayName
+        ? `${pinned} (${metadata.displayName})`
+        : metadata.email
+          ? `${pinned} (${metadata.email})`
+          : pinned;
+      return { authProfileId: pinned, authProfileLabel: label };
+    })(),
     modelOverrideSource: resolveSessionModelOverrideSource(entry),
     modelSelectionLocked: entry?.modelSelectionLocked,
     agentRuntime: projectWorkerPlacementAgentRuntime(thinkingProjection.agentRuntime),

@@ -24,6 +24,17 @@ export type ModelAuthStatusProfile = {
   expiry?: ModelAuthExpiry;
   /** True only for saved OAuth/token profiles this gateway can remove. */
   logoutSupported?: boolean;
+  /** Operator-facing label: displayName, email, or profile id. */
+  label?: string;
+  /** Account email when known from config or stored profile metadata. */
+  email?: string;
+  /** Agent ids that pin this profile via agents.entries.<id>.auth.profiles. */
+  pinnedByAgentIds?: string[];
+  /**
+   * True when this profile is a native CLI login marker (Claude Code / Codex CLI),
+   * not an OpenClaw agent-loop subscription.
+   */
+  cliSubscription?: boolean;
 };
 
 export type ModelAuthStatusProvider = {

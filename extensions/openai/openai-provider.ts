@@ -54,6 +54,7 @@ import {
   OPENAI_GPT_56_MODEL_ID,
   OPENAI_GPT_56_SOL_MODEL_ID,
   OPENAI_GPT_56_TERRA_MODEL_ID,
+  OPENAI_GPT_6_ASTRA_MODEL_ID,
   OPENAI_PROVIDER_MODERN_MODEL_IDS,
   isOpenAIPlatformOnlyRouteModelId,
   isOpenAISubscriptionOnlyRouteModelId,
@@ -409,31 +410,35 @@ function resolveCodexModelInput(
 
 function normalizeOpenAICodexCatalogModel(model: ModelDefinitionConfig): ModelDefinitionConfig {
   const modelId = normalizeLowercaseStringOrEmpty(model.id);
-  if (
+  const supportedReasoningEfforts = resolveOpenAICodexReasoningEfforts(
+    modelId,
+    model.compat?.supportedReasoningEfforts?.filter((effort) => effort !== "none"),
+  );
+  if (supportedReasoningEfforts === undefined) {
+    return model;
+  }
+  const isGpt56Variant =
     modelId === OPENAI_GPT_56_SOL_MODEL_ID ||
     modelId === OPENAI_GPT_56_TERRA_MODEL_ID ||
-    modelId === OPENAI_GPT_56_LUNA_MODEL_ID
-  ) {
-    const supportedReasoningEfforts = resolveOpenAICodexReasoningEfforts(
-      modelId,
-      model.compat?.supportedReasoningEfforts?.filter((effort) => effort !== "none"),
-    );
-    return {
-      ...model,
-      contextWindow: OPENAI_CODEX_GPT_56_CONTEXT_WINDOW,
-      contextTokens: OPENAI_DEFAULT_RUNTIME_CONTEXT_TOKENS,
-      thinkingLevelMap: { ...model.thinkingLevelMap, off: null },
-      ...(model.compat
-        ? {
-            compat: {
-              ...model.compat,
-              ...(supportedReasoningEfforts ? { supportedReasoningEfforts } : {}),
-            },
-          }
-        : {}),
-    };
-  }
-  return model;
+    modelId === OPENAI_GPT_56_LUNA_MODEL_ID;
+  return {
+    ...model,
+    ...(isGpt56Variant
+      ? {
+          contextWindow: OPENAI_CODEX_GPT_56_CONTEXT_WINDOW,
+          contextTokens: OPENAI_DEFAULT_RUNTIME_CONTEXT_TOKENS,
+        }
+      : {}),
+    thinkingLevelMap: { ...model.thinkingLevelMap, off: null },
+    ...(model.compat
+      ? {
+          compat: {
+            ...model.compat,
+            supportedReasoningEfforts,
+          },
+        }
+      : {}),
+  };
 }
 
 function resolveCodexModelFallback(modelId: string): ModelDefinitionConfig | undefined {
@@ -494,7 +499,9 @@ function buildOpenAICodexModelFromLiveRow(row: unknown): ModelDefinitionConfig |
       : fallback?.compat;
   const thinkingLevelMap = {
     ...(reasoningLevels === undefined ? fallback?.thinkingLevelMap : {}),
-    ...(normalizedModelId.startsWith("gpt-5.6") ? { off: null } : {}),
+    ...(normalizedModelId.startsWith("gpt-5.6") || normalizedModelId === OPENAI_GPT_6_ASTRA_MODEL_ID
+      ? { off: null }
+      : {}),
     ...(reasoningLevels?.includes("xhigh") ? { xhigh: "xhigh" as const } : {}),
     ...(reasoningLevels?.includes("max") ? { max: "max" as const } : {}),
   };
@@ -528,8 +535,9 @@ function buildOpenAICodexStaticProviderConfig(): ModelProviderConfig {
       if (isOpenAIPlatformOnlyRouteModelId(modelId)) {
         return [];
       }
-      // Static OAuth rows are offline hints, not entitlement claims. Keep only
-      // the proven GPT-5.6 subscription route; live discovery may add others.
+      // Static OAuth rows are offline hints, not entitlement claims. Keep the
+      // proven GPT-5.6 Sol and GPT-6 Astra subscription routes; live discovery
+      // may add others.
       if (modelId.startsWith("gpt-5.6") && modelId !== OPENAI_GPT_56_SOL_MODEL_ID) {
         return [];
       }
@@ -799,6 +807,7 @@ const OPENAI_GPT_FORWARD_COMPAT_CASES = [
   },
   {
     match: [
+      OPENAI_GPT_6_ASTRA_MODEL_ID,
       OPENAI_GPT_56_MODEL_ID,
       OPENAI_GPT_56_SOL_MODEL_ID,
       OPENAI_GPT_56_TERRA_MODEL_ID,
@@ -837,6 +846,7 @@ function resolveOpenAIGptForwardCompatModel(ctx: ProviderResolveDynamicModelCont
   const modelId = normalizeLowercaseStringOrEmpty(trimmedModelId);
   const exactModel = ctx.modelRegistry.find(PROVIDER_ID, trimmedModelId);
   if (
+    modelId === OPENAI_GPT_6_ASTRA_MODEL_ID ||
     modelId === OPENAI_GPT_56_SOL_MODEL_ID ||
     modelId === OPENAI_GPT_56_TERRA_MODEL_ID ||
     modelId === OPENAI_GPT_56_LUNA_MODEL_ID

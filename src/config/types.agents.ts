@@ -81,6 +81,16 @@ export type AgentAcpBinding = {
 
 export type AgentBinding = AgentRouteBinding | AgentAcpBinding;
 
+/** Per-agent auth pins: map provider id → auth profile id. */
+export type AgentAuthConfig = {
+  /**
+   * Provider → profile id pins for this agent.
+   * When set for the active provider, OpenClaw uses that profile unless a
+   * session user pin or model-ref `@profile` suffix overrides it.
+   */
+  profiles?: Record<string, string>;
+};
+
 export type AgentConfig = {
   id: string;
   /** @deprecated Raw legacy list compatibility only; canonical agents.entries rejects this key. */
@@ -92,6 +102,8 @@ export type AgentConfig = {
   /** Working directory for agent reply runs; overrides agents.defaults.cwd. */
   cwd?: string;
   agentDir?: string;
+  /** Optional per-agent auth profile pins by provider. */
+  auth?: AgentAuthConfig;
   model?: AgentModelConfig;
   /** Optional per-agent model for short internal tasks such as generated session titles. */
   utilityModel?: string;

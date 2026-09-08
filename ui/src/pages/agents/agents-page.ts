@@ -6,19 +6,26 @@ import type {
   AgentIdentityResult,
   AgentsFilesListResult,
   AgentsListResult,
+  ModelAuthStatusResult,
   ModelCatalogEntry,
   SkillStatusReport,
+  SystemAgentSetupDetectResult,
   ToolsCatalogResult,
   ToolsEffectiveResult,
 } from "../../api/types.ts";
 import { subtitleForRoute, titleForRoute } from "../../app-navigation.ts";
 import { applicationContext, type ApplicationContext } from "../../app/context.ts";
 import { resolveControlUiAuthToken } from "../../app/control-ui-auth.ts";
+import { hasOperatorAdminAccess } from "../../app/operator-access.ts";
 import { renderLearnMoreLink } from "../../components/settings-ui.ts";
 import { renderSettingsWorkspace } from "../../components/settings-workspace.ts";
 import { GitHubIdentityController } from "../../features/github-connections/github-identity-controller.ts";
 import { t } from "../../i18n/index.ts";
-import { resolveAgentSkillsFilter, selectableAgentsList } from "../../lib/agents/display.ts";
+import {
+  resolveAgentConfig,
+  resolveAgentSkillsFilter,
+  selectableAgentsList,
+} from "../../lib/agents/display.ts";
 import {
   loadToolsCatalog,
   loadToolsEffective,
@@ -46,12 +53,24 @@ import {
 import { formatUiError } from "../../lib/format-error.ts";
 import {
   canCallGatewayMethod,
+  isGatewayMethodAdvertised,
   type GatewayMethodOperatorScope,
 } from "../../lib/gateway-methods.ts";
+import { loadModelAuthStatus } from "../../lib/model-auth.ts";
 import { parseAgentSessionKey } from "../../lib/sessions/session-key.ts";
 import { GatewayPageController } from "../../lit/gateway-page-controller.ts";
 import { OpenClawLightDomElement } from "../../lit/openclaw-element.ts";
 import { SubscriptionsController } from "../../lit/subscriptions-controller.ts";
+import { detectModelSetup } from "../model-setup/rpc.ts";
+import { initialWizardValue, type ModelSetupWizardState } from "../model-setup/state.ts";
+import {
+  ModelSetupWizardRunner,
+  type ModelSetupWizardCompletion,
+} from "../model-setup/wizard-runner.ts";
+import { renderModelSetupWizard } from "../model-setup/wizard-view.ts";
+import "../../styles/model-setup.css";
+import { stageAgentAuthProfiles } from "./auth-config.ts";
+import { findNewAuthProfilePin, type AgentAuthPinDraft } from "./auth-pins.ts";
 import { loadAgentFileContent, saveAgentFile } from "./files.ts";
 import {
   resetIdentityDraft,
@@ -98,6 +117,17 @@ class AgentsPage
   @state() toolsEffectiveResult: ToolsEffectiveResult | null = null;
   @state() chatModelCatalog: ModelCatalogEntry[] = [];
   @state() chatModelCatalogError: string | null = null;
+  @state() modelAuthStatus: ModelAuthStatusResult | null = null;
+  @state() modelAuthStatusError: string | null = null;
+  @state() authPinDrafts: AgentAuthPinDraft[] = [];
+  @state() subscriptionPanel: "closed" | "pick" | "api-key" = "closed";
+  @state() setupDetect: SystemAgentSetupDetectResult | null = null;
+  @state() apiKeyProviderId = "";
+  @state() apiKeyValue = "";
+  @state() subscriptionBusy = false;
+  @state() authWizardState: ModelSetupWizardState = { phase: "idle" };
+  @state() authWizardValue: unknown = null;
+  @state() authWizardRefreshWarning: string | null = null;
   @state() agentFilesLoading = false;
   @state() agentFilesError: string | null = null;
   @state() agentFilesList: AgentsFilesListResult | null = null;
@@ -131,6 +161,30 @@ class AgentsPage
     generation: number;
     agentId: string;
   } | null = null;
+  private modelAuthStatusAgentId: string | null = null;
+  private modelAuthStatusRequest: {
+    client: GatewayBrowserClient;
+    generation: number;
+    agentId: string;
+  } | null = null;
+  private authSubscriptionProviderHint: string | null = null;
+  private authWizardReturnFocus: HTMLElement | null = null;
+  private readonly authWizard = new ModelSetupWizardRunner({
+    getClient: () => this.client,
+    getAgentId: () => this.resolveSelectedAgentId(),
+    onChange: (next) => {
+      const previousStep =
+        this.authWizardState.phase === "step" ? this.authWizardState.step.id : null;
+      this.authWizardState = next;
+      if (next.phase === "step" && next.step.id !== previousStep) {
+        this.authWizardValue = initialWizardValue(next.step);
+      }
+      this.subscriptionBusy = next.phase === "starting" || (next.phase === "step" && next.busy);
+    },
+    requestFailedMessage: () => t("modelSetup.errors.requestFailed"),
+    cancelledMessage: () => t("modelSetup.wizard.cancelled"),
+    sessionExpiredMessage: () => t("modelSetup.wizard.sessionExpired"),
+  });
   private normalizedLocation = "";
   private githubProfileId: string | null = null;
   private readonly githubIdentity = new GitHubIdentityController({
@@ -149,6 +203,10 @@ class AgentsPage
       this.chatModelCatalog = [];
       this.chatModelCatalogAgentId = null;
       this.chatModelCatalogError = null;
+      this.modelAuthStatus = null;
+      this.modelAuthStatusAgentId = null;
+      this.modelAuthStatusError = null;
+      this.modelAuthStatusRequest = null;
     },
     onSnapshot: () => this.syncGatewayState(),
     ensureInitialData: () => this.ensureInitialData(),
@@ -289,6 +347,7 @@ class AgentsPage
   override disconnectedCallback() {
     this.githubIdentity.dispose();
     this.subscriptions.clear();
+    void this.authWizard.cancel();
     super.disconnectedCallback();
   }
 
@@ -519,6 +578,7 @@ class AgentsPage
     }
     if (this.agentsPanel === "overview") {
       this.ensureModelCatalog();
+      this.ensureModelAuthStatus();
       return;
     }
     if (this.agentsPanel === "files" && this.agentFilesList?.agentId !== agentId) {
@@ -651,6 +711,252 @@ class AgentsPage
       });
   }
 
+  private ensureModelAuthStatus(options: { refresh?: boolean } = {}) {
+    const client = this.client;
+    const agentId = this.resolveSelectedAgentId();
+    if (!client || !this.connected || !agentId) {
+      return;
+    }
+    if (
+      !options.refresh &&
+      this.modelAuthStatus &&
+      this.modelAuthStatusAgentId === agentId &&
+      !this.modelAuthStatusRequest
+    ) {
+      return;
+    }
+    const generation = this.requestGeneration;
+    const previousRequest = this.modelAuthStatusRequest;
+    if (
+      previousRequest?.client === client &&
+      previousRequest.generation === generation &&
+      previousRequest.agentId === agentId &&
+      !options.refresh
+    ) {
+      return;
+    }
+    if (this.modelAuthStatusAgentId !== agentId) {
+      this.modelAuthStatus = null;
+    }
+    const request = { client, generation, agentId };
+    this.modelAuthStatusRequest = request;
+    this.modelAuthStatusError = null;
+    void loadModelAuthStatus(client, {
+      agentId,
+      refresh: options.refresh,
+    })
+      .then((result) => {
+        if (this.isCurrentRequest(client, generation, agentId)) {
+          this.modelAuthStatus = result;
+          this.modelAuthStatusAgentId = agentId;
+          this.modelAuthStatusError = null;
+        }
+      })
+      .catch((error: unknown) => {
+        if (this.isCurrentRequest(client, generation, agentId)) {
+          this.modelAuthStatusAgentId = null;
+          this.modelAuthStatusError = formatUiError(error);
+        }
+      })
+      .finally(() => {
+        if (this.modelAuthStatusRequest === request) {
+          this.modelAuthStatusRequest = null;
+        }
+      });
+  }
+
+  private resetAuthSubscriptionUi() {
+    void this.authWizard.cancel();
+    this.authWizardState = { phase: "idle" };
+    this.authWizardValue = null;
+    this.authWizardRefreshWarning = null;
+    this.authWizardReturnFocus = null;
+    this.authSubscriptionProviderHint = null;
+    this.authPinDrafts = [];
+    this.subscriptionPanel = "closed";
+    this.setupDetect = null;
+    this.apiKeyProviderId = "";
+    this.apiKeyValue = "";
+    this.subscriptionBusy = false;
+    this.modelAuthStatus = null;
+    this.modelAuthStatusAgentId = null;
+    this.modelAuthStatusError = null;
+    this.modelAuthStatusRequest = null;
+  }
+
+  private canUseSetupAuth(): boolean {
+    const snapshot = this.context.gateway.snapshot;
+    return Boolean(
+      this.client &&
+      this.connected &&
+      hasOperatorAdminAccess(snapshot.hello?.auth ?? null) &&
+      isGatewayMethodAdvertised(snapshot, "openclaw.setup.detect") === true &&
+      isGatewayMethodAdvertised(snapshot, "openclaw.setup.auth.start") === true,
+    );
+  }
+
+  private async openSubscriptionPanel() {
+    if (!this.canUseSetupAuth() || !this.client) {
+      this.subscriptionPanel = "pick";
+      this.setupDetect = null;
+      return;
+    }
+    this.subscriptionPanel = "pick";
+    this.subscriptionBusy = true;
+    const client = this.client;
+    const agentId = this.resolveSelectedAgentId();
+    const generation = this.requestGeneration;
+    try {
+      const result = await detectModelSetup(client, agentId ?? undefined);
+      if (!this.isCurrentRequest(client, generation, agentId ?? undefined)) {
+        return;
+      }
+      this.setupDetect = result;
+      this.apiKeyProviderId = result.manualProviders[0]?.id ?? "";
+    } catch (error) {
+      if (this.isCurrentRequest(client, generation, agentId ?? undefined)) {
+        this.modelAuthStatusError = formatUiError(error);
+        this.setupDetect = null;
+      }
+    } finally {
+      if (this.isCurrentRequest(client, generation, agentId ?? undefined)) {
+        this.subscriptionBusy = false;
+      }
+    }
+  }
+
+  private closeSubscriptionPanel() {
+    if (this.authWizardState.phase !== "idle") {
+      return;
+    }
+    this.subscriptionPanel = "closed";
+    this.apiKeyValue = "";
+  }
+
+  private async runAuthWizardMutation(
+    task: () => Promise<ModelSetupWizardCompletion | null>,
+  ): Promise<void> {
+    const client = this.client;
+    if (!client || !this.canUseSetupAuth() || this.subscriptionBusy) {
+      return;
+    }
+    if (this.authWizardState.phase === "idle") {
+      const active = this.ownerDocument.activeElement;
+      this.authWizardReturnFocus =
+        active instanceof HTMLElement && this.contains(active) ? active : null;
+    }
+    const before = this.modelAuthStatus;
+    this.subscriptionBusy = true;
+    try {
+      const mutation = await this.context.runtimeConfig.runExternalMutation(
+        async (mutationClient) => {
+          if (mutationClient !== client) {
+            throw new Error("Connection changed before subscription setup continued.");
+          }
+          return await task();
+        },
+        {
+          canDispatch: () => this.client === client && this.canUseSetupAuth(),
+          dispatchError: t("modelSetup.errors.requestFailed"),
+        },
+      );
+      if (!mutation.ok) {
+        this.authWizard.fail(mutation.error);
+        return;
+      }
+      this.authWizardRefreshWarning = mutation.refresh.ok ? null : mutation.refresh.error;
+      if (mutation.value) {
+        await this.finishAuthSubscription(mutation.value, before);
+      }
+    } catch (error) {
+      this.authWizard.fail(formatUiError(error, t("modelSetup.errors.requestFailed")));
+    } finally {
+      this.subscriptionBusy =
+        this.authWizardState.phase === "starting" ||
+        (this.authWizardState.phase === "step" && this.authWizardState.busy);
+    }
+  }
+
+  private startAuthSubscription(authChoiceId: string, providerHint?: string | null) {
+    this.authSubscriptionProviderHint = providerHint ?? null;
+    void this.runAuthWizardMutation(() => this.authWizard.start(authChoiceId));
+  }
+
+  private saveApiKeySubscription() {
+    const authChoice = this.apiKeyProviderId.trim();
+    const apiKey = this.apiKeyValue.trim();
+    if (!authChoice || !apiKey) {
+      return;
+    }
+    const manual = this.setupDetect?.manualProviders.find((provider) => provider.id === authChoice);
+    this.authSubscriptionProviderHint = manual?.brandId ?? null;
+    void this.runAuthWizardMutation(() =>
+      this.authWizard.activate({ kind: "api-key", authChoice, apiKey }, `manual:${authChoice}`),
+    );
+  }
+
+  private answerAuthWizard(value: unknown, includeValue = true) {
+    void this.runAuthWizardMutation(() => this.authWizard.answer(value, includeValue));
+  }
+
+  private cancelAuthWizard() {
+    this.subscriptionBusy = false;
+    void this.authWizard.cancel({ settleActiveRequest: true });
+    this.authWizardState = { phase: "idle" };
+    this.authWizardValue = null;
+    this.authSubscriptionProviderHint = null;
+  }
+
+  private async finishAuthSubscription(
+    completion: ModelSetupWizardCompletion | null,
+    before: ModelAuthStatusResult | null,
+  ) {
+    if (!completion) {
+      return;
+    }
+    const agentId = this.resolveSelectedAgentId();
+    if (!agentId || !this.canCall("config.set", "operator.admin")) {
+      this.authWizard.close();
+      this.subscriptionPanel = "closed";
+      this.apiKeyValue = "";
+      return;
+    }
+    const client = this.client;
+    let after = this.modelAuthStatus;
+    if (client) {
+      try {
+        after = await loadModelAuthStatus(client, { agentId, refresh: true });
+        this.modelAuthStatus = after;
+        this.modelAuthStatusAgentId = agentId;
+        this.modelAuthStatusError = null;
+      } catch (error) {
+        this.authWizardRefreshWarning = formatUiError(error);
+      }
+    }
+    if (after) {
+      const pin = findNewAuthProfilePin({
+        before,
+        after,
+        providerHint: this.authSubscriptionProviderHint,
+        modelRef: completion.modelActivation?.modelRef,
+      });
+      if (pin) {
+        const configForm = currentConfigObject(this.context.runtimeConfig.state);
+        const existing = resolveAgentConfig(configForm, agentId)?.entry?.auth?.profiles ?? {};
+        stageAgentAuthProfiles(this.context.runtimeConfig, agentId, {
+          ...existing,
+          [pin.provider]: pin.profileId,
+        });
+      }
+    }
+    this.authWizard.close();
+    this.subscriptionPanel = "closed";
+    this.authSubscriptionProviderHint = null;
+    this.authPinDrafts = [];
+    this.apiKeyValue = "";
+    this.subscriptionBusy = false;
+  }
+
   private async loadAgentsAndCommit() {
     const client = this.client;
     const generation = this.requestGeneration;
@@ -755,6 +1061,7 @@ class AgentsPage
     this.chatModelCatalog = [];
     this.chatModelCatalogAgentId = null;
     this.chatModelCatalogError = null;
+    this.resetAuthSubscriptionUi();
     this.agentFilesList = null;
     this.agentFilesError = null;
     this.agentFileActive = null;
@@ -943,8 +1250,8 @@ class AgentsPage
           </div>
         </div>
       </section>
-      ${renderSettingsWorkspace(
-        renderAgents({
+      ${renderSettingsWorkspace(html`
+        ${renderAgents({
           access,
           basePath: this.context.basePath,
           authToken: this.controlUiAuthToken(),
@@ -1016,6 +1323,14 @@ class AgentsPage
           runtimeSessionMatchesSelectedAgent: selectedAgentId === this.chatAgentId(),
           modelCatalog: this.chatModelCatalog,
           modelCatalogError: this.chatModelCatalogError,
+          authStatus: this.modelAuthStatus,
+          authStatusError: this.modelAuthStatusError,
+          authPinDrafts: this.authPinDrafts,
+          subscriptionPanel: this.subscriptionPanel,
+          setupDetect: this.setupDetect,
+          apiKeyProviderId: this.apiKeyProviderId,
+          apiKeyValue: this.apiKeyValue,
+          subscriptionBusy: this.subscriptionBusy,
           pinnedAgentIds: this.context.navigation.snapshot.pinnedAgentIds,
           onTogglePinnedAgent: (agentId) => togglePinnedAgent(this.context.navigation, agentId),
           onRefresh: () => this.refreshAgents(),
@@ -1168,9 +1483,54 @@ class AgentsPage
               stageAgentModelFallbacks(this.context.runtimeConfig, agentId, fallbacks);
             }
           },
+          onAuthProfilesChange: (agentId, profiles) => {
+            if (this.canCall("config.set", "operator.admin")) {
+              stageAgentAuthProfiles(this.context.runtimeConfig, agentId, profiles);
+            }
+          },
+          onAuthPinDraftsChange: (drafts) => {
+            this.authPinDrafts = drafts;
+          },
+          onOpenSubscriptionPanel: () => {
+            if (this.subscriptionPanel === "api-key") {
+              this.subscriptionPanel = "pick";
+              return;
+            }
+            void this.openSubscriptionPanel();
+          },
+          onCloseSubscriptionPanel: () => this.closeSubscriptionPanel(),
+          onStartAuthSubscription: (authChoiceId, providerHint) =>
+            this.startAuthSubscription(authChoiceId, providerHint),
+          onShowApiKeyForm: () => {
+            this.subscriptionPanel = "api-key";
+          },
+          onApiKeyProviderChange: (providerId) => {
+            this.apiKeyProviderId = providerId;
+          },
+          onApiKeyValueChange: (value) => {
+            this.apiKeyValue = value;
+          },
+          onSaveApiKeySubscription: () => this.saveApiKeySubscription(),
+          onAuthStatusRetry: () => this.ensureModelAuthStatus({ refresh: true }),
           onSetDefault: (agentId) => this.setDefaultAgent(agentId),
-        }),
-      )}
+        })}
+        ${renderModelSetupWizard({
+          mode: "auth",
+          state: this.authWizardState,
+          refreshWarning: this.authWizardRefreshWarning,
+          value: this.authWizardValue,
+          onValueChange: (value) => {
+            this.authWizardValue = value;
+          },
+          onAnswer: (value, includeValue) => this.answerAuthWizard(value, includeValue),
+          onCancel: () => this.cancelAuthWizard(),
+          onClose: () => {
+            this.authWizard.close();
+            this.authWizardState = { phase: "idle" };
+            this.subscriptionBusy = false;
+          },
+        })}
+      `)}
     `;
   }
 }

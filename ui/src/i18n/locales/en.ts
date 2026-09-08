@@ -1117,6 +1117,8 @@ export const en: TranslationMap & {
     openSession: "Open session",
     model: "Model",
     provider: "Provider",
+    authProfile: "Auth profile",
+    usingAuthProfile: "Using: {label}",
     runtime: "Runtime",
     runDuration: "Run duration",
     lastActive: "Last active {time}",
@@ -1341,6 +1343,26 @@ export const en: TranslationMap & {
       inheritDefault: "Inherit default",
       inheritDefaultModel: "Inherit default ({model})",
       fallbacks: "Fallbacks",
+      authPins: "Subscription pins",
+      authPinsHelp:
+        "Pin a named subscription per provider so this agent always uses that credential. Add a subscription here or pick one already loaded on this gateway. Session /model @profile pins still override.",
+      authPinProvider: "Provider",
+      authPinProfile: "Subscription",
+      authPinSelectProvider: "Select provider…",
+      authPinSelectProfile: "Select subscription…",
+      authPinAdd: "Add pin",
+      authPinAddSubscription: "Add subscription…",
+      authPinAddSubscriptionTitle: "Add subscription for this agent",
+      authPinAddSubscriptionHelp:
+        "Sign in with OAuth or paste an API key. The new credential is pinned to this agent automatically.",
+      authPinAddSubscriptionEmpty: "No sign-in methods are available from the gateway right now.",
+      authPinAddApiKey: "Paste API key…",
+      authPinApiKey: "API key",
+      authPinSaveApiKey: "Save and pin",
+      authPinRemove: "Remove",
+      authPinModelOtherProviders: "Other providers",
+      authPinModelHint:
+        "This model’s provider has no subscription pin. Pin one above or add a subscription so runs use the right account.",
     },
     toolCatalog: {
       groups: {
@@ -4655,6 +4677,11 @@ export const en: TranslationMap & {
       envKeyNamed: "API key from environment ({name})",
       profileKey: "API key profiles: {count}",
       none: "Not configured",
+      profilesHeading: "Loaded profiles",
+      pinnedBy: "Pinned by {agents}",
+      cliSubscription: "CLI subscription",
+      profileStatus: "{status}",
+      noNamedProfiles: "No named profiles loaded for this provider.",
     },
     apiKey: {
       label: "API key",

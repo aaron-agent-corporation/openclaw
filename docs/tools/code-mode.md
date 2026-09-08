@@ -444,7 +444,7 @@ Bundled provider catalogs currently flag these models as `"preferred"`:
 | kimi      | `k3`, `k3-256k`                                                                                                                                                  |
 | minimax   | `MiniMax-M3`                                                                                                                                                     |
 | moonshot  | `kimi-k3`                                                                                                                                                        |
-| openai    | `gpt-5.6`, `gpt-5.6-sol`, `gpt-5.6-terra`, `gpt-5.6-luna`, `gpt-5.5`, `gpt-5.5-pro`                                                                              |
+| openai    | `gpt-6-astra`, `gpt-5.6`, `gpt-5.6-sol`, `gpt-5.6-terra`, `gpt-5.6-luna`, `gpt-5.5`, `gpt-5.5-pro`                                                               |
 | xiaomi    | `mimo-v2.5`                                                                                                                                                      |
 | zai       | `glm-5.3`, `glm-5.2`, `glm-5.1`                                                                                                                                  |
 

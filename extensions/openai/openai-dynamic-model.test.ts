@@ -28,6 +28,35 @@ const preferredModels = [
 describe("OpenAI dynamic model capabilities", () => {
   afterEach(() => vi.unstubAllEnvs());
 
+  it("retains GPT-6 Astra catalog capabilities without discovery", () => {
+    const model = buildOpenAIProvider().resolveDynamicModel?.({
+      provider: "openai",
+      modelId: "gpt-6-astra",
+      agentRuntimeId: "openclaw",
+      modelRegistry: modelRegistry(),
+    });
+
+    expect(model).toMatchObject({
+      id: "gpt-6-astra",
+      provider: "openai",
+      api: "openai-responses",
+      baseUrl: "https://api.openai.com/v1",
+      reasoning: true,
+      input: ["text", "image"],
+      contextWindow: 1_050_000,
+      contextTokens: 272_000,
+      maxTokens: 128_000,
+      cost: { input: 10, output: 50, cacheRead: 1, cacheWrite: 12.5 },
+      thinkingLevelMap: { xhigh: "xhigh", max: "max" },
+      compat: {
+        codeMode: "preferred",
+        supportsReasoningEffort: true,
+        supportsTemperature: false,
+        supportedReasoningEfforts: ["low", "medium", "high", "xhigh", "max"],
+      },
+    });
+  });
+
   it.each(preferredModels)(
     "retains preferred capabilities for $id without discovery",
     ({ id, cost }) => {

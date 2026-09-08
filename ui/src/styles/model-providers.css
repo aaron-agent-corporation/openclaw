@@ -87,6 +87,35 @@
   text-align: right;
 }
 
+.model-providers__credentials {
+  flex-wrap: wrap;
+}
+
+.model-providers__profile-list {
+  flex: 1 0 100%;
+  display: grid;
+  gap: 6px;
+  padding-top: 8px;
+  color: var(--text);
+  font-size: 12px;
+}
+
+.model-providers__profile-heading {
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.model-providers__profile-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.model-providers__profile-row strong {
+  text-align: left;
+}
+
 .model-providers__card-actions,
 .model-providers__form-actions {
   display: flex;

@@ -15,3 +15,54 @@
 .agents-panel-body + .settings-kv {
   border-top: 1px solid color-mix(in srgb, var(--border) 60%, transparent);
 }
+
+.agent-auth-pins {
+  display: grid;
+  gap: var(--space-3);
+  width: 100%;
+}
+
+.agent-auth-pins__row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr) auto;
+  gap: var(--space-2);
+  align-items: end;
+}
+
+.agent-auth-pins__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.agent-auth-pins__subscription {
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  border: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
+  border-radius: var(--radius-2);
+  background: color-mix(in srgb, var(--bg) 92%, var(--border));
+}
+
+.agent-auth-pins__subscription-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.agent-auth-pins__subscription-list {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.agent-auth-pins__subscription-list .btn {
+  justify-content: flex-start;
+  text-align: start;
+}
+
+.agent-auth-pin-hint {
+  margin: var(--space-2) 0 0;
+  color: var(--muted);
+  font-size: var(--font-size-sm);
+}
