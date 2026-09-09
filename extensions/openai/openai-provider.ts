@@ -36,6 +36,7 @@ import {
   isOpenAIHttpsApiBaseUrl,
   resolveOpenAIDefaultBaseUrl,
 } from "./base-url.js";
+import { OPENAI_CODEX_CLIENT_VERSION } from "./codex-client-version.js";
 import {
   applyOpenAIConfig,
   OPENAI_CODEX_DEFAULT_MODEL,
@@ -91,9 +92,6 @@ function classifyOpenAiFailoverCode(code: string | undefined) {
   }
 }
 const OPENAI_MODELS_ENDPOINT = "https://api.openai.com/v1/models";
-// Keep synchronized with extensions/codex's exact @openai/codex dependency;
-// the provider contract test fails when that managed-runtime pin changes.
-const OPENAI_CODEX_CLIENT_VERSION = "0.154.0-alpha.11";
 const OPENAI_CODEX_MODELS_ENDPOINT = `${OPENAI_CODEX_RESPONSES_BASE_URL}/models?client_version=${OPENAI_CODEX_CLIENT_VERSION}`;
 const OPENAI_MODELS_CACHE_TTL_MS = 60_000;
 const OPENAI_CODEX_MODELS_CACHE_TTL_MS = 60_000;

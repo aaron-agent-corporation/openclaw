@@ -29,6 +29,7 @@ import {
   isOpenAICodexBaseUrl,
   OPENAI_CODEX_RESPONSES_BASE_URL,
 } from "./base-url.js";
+import { OPENAI_CODEX_CLIENT_VERSION } from "./codex-client-version.js";
 import { OPENAI_CODEX_DEFAULT_MODEL } from "./default-models.js";
 import {
   OPENAI_CHATGPT_MODERN_MODEL_IDS,
@@ -200,11 +201,18 @@ function normalizeCodexTransport(model: ProviderRuntimeModel): ProviderRuntimeMo
   });
   const api = normalizedTransport.api ?? model.api;
   const baseUrl = normalizedTransport.baseUrl ?? model.baseUrl;
+  // The ChatGPT backend gates newer models on the caller's Codex version, so
+  // every direct-transport row must carry the managed harness pin.
+  const headers =
+    api === "openai-chatgpt-responses" && model.headers?.version !== OPENAI_CODEX_CLIENT_VERSION
+      ? { ...model.headers, version: OPENAI_CODEX_CLIENT_VERSION }
+      : model.headers;
   if (
     api === model.api &&
     baseUrl === model.baseUrl &&
     canonicalModelId === model.id &&
-    canonicalName === model.name
+    canonicalName === model.name &&
+    headers === model.headers
   ) {
     return model;
   }
@@ -214,6 +222,7 @@ function normalizeCodexTransport(model: ProviderRuntimeModel): ProviderRuntimeMo
     name: canonicalName,
     api,
     baseUrl,
+    ...(headers ? { headers } : {}),
   };
 }
 
