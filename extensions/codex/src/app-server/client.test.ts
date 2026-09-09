@@ -15,7 +15,9 @@ const CODEX_DYNAMIC_TOOL_SERVER_REQUEST_TIMEOUT_MS = 660_000;
 
 describe("CodexAppServerClient", () => {
   const clients: CodexAppServerClient[] = [];
-  const newerMinorVersion = new SemVer(CODEX_APP_SERVER_VERSION).inc("minor").version;
+  // Pin may be a prerelease; inc("minor") would only finalize it, so build the next minor explicitly.
+  const pinned = new SemVer(CODEX_APP_SERVER_VERSION);
+  const newerMinorVersion = `${pinned.major}.${pinned.minor + 1}.0`;
 
   function startInitialize() {
     const harness = createClientHarness();
