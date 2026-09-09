@@ -122,7 +122,7 @@ Use explicit config when:
     | OpenAI-only request shaping | Not applied |
     | `service_tier`, Responses `store`, prompt-cache hints | Not sent |
     | Reasoning-compat payload shaping | Not applied |
-    | Hidden attribution headers (`originator`, `version`, `User-Agent`) | Not injected on custom SGLang base URLs |
+    | Hidden attribution headers (`originator`, `User-Agent`) | Not injected on custom SGLang base URLs |
 
   </Accordion>
 

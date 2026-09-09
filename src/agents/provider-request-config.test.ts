@@ -524,7 +524,9 @@ describe("provider request config", () => {
     });
 
     expect(resolved?.originator).toBe("openclaw");
-    expect(typeof resolved?.version).toBe("string");
+    // Attribution owns originator/User-Agent only; `version` is the Codex
+    // client version and is stamped by the OpenAI plugin on ChatGPT rows.
+    expect(resolved?.version).toBeUndefined();
     expect(resolved?.["User-Agent"]).toMatch(/^openclaw\//);
     expect(resolved?.["X-Custom"]).toBe("1");
   });
@@ -677,7 +679,7 @@ describe("provider request config", () => {
     expect(resolved.capabilities.allowsResponsesStore).toBe(true);
     expect(resolved.headers?.authorization).toBe("Bearer test-key");
     expect(resolved.headers?.originator).toBe("openclaw");
-    expect(typeof resolved.headers?.version).toBe("string");
+    expect(resolved.headers?.version).toBeUndefined();
     expect(resolved.headers?.["User-Agent"]).toMatch(/^openclaw\//);
     expect(resolved.headers?.["X-Custom"]).toBe("1");
   });
