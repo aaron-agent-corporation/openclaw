@@ -161,7 +161,7 @@ Flow shape (PKCE):
 
 1. generate a PKCE verifier/challenge and a random `state`
 2. open `https://auth.openai.com/oauth/authorize?...` (scope
-   `openid profile email offline_access`)
+   `openid profile email offline_access api.connectors.read api.connectors.invoke`, matching the Codex CLI login)
 3. try to capture the callback on `http://localhost:1455/auth/callback` (the
    callback host defaults to `localhost` and only accepts loopback hosts;
    override with `OPENCLAW_OAUTH_CALLBACK_HOST`)

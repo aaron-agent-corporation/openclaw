@@ -7,7 +7,10 @@ const CALLBACK_PORT = 1455;
 const CALLBACK_PATH = "/auth/callback";
 const DEFAULT_CALLBACK_HOST = "localhost";
 const LOOPBACK_CALLBACK_HOSTS = new Set(["localhost", "127.0.0.1", "::1"]);
-const SCOPE = "openid profile email offline_access";
+// Mirrors the Codex CLI login (codex-rs/login/src/server.rs build_authorize_url). The
+// connectors scopes arrived with GPT-6 Astra; the ChatGPT backend rejects Astra
+// requests from tokens minted without them as "requires a newer version of Codex".
+const SCOPE = "openid profile email offline_access api.connectors.read api.connectors.invoke";
 
 const loadNodeCrypto = createLazyRuntimeModule(() =>
   import("node:crypto").then((cryptoModule) => cryptoModule.randomBytes),
