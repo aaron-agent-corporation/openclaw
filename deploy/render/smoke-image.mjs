@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import { randomBytes } from "node:crypto";
 import { setTimeout } from "node:timers/promises";
+import { verifyUiAssets } from "./verify-ui-assets.mjs";
 
 const image = process.argv[2];
 const version = process.env.IMAGE_VERSION;
@@ -113,15 +114,11 @@ try {
   const response = await fetch(`${base}/`, { signal: AbortSignal.timeout(5000) });
   assert.equal(response.status, 200);
   const html = await response.text();
-  const asset = html.match(/<script\b[^>]*\bsrc=["']([^"']+\.js)["']/i)?.[1];
-  assert(asset, "Control UI HTML has no JavaScript bundle");
-  const assetUrl = new URL(asset, `${base}/`);
-  assert.equal(assetUrl.origin, base, "Control UI bundle must be served by this gateway");
-  const bundle = await fetch(assetUrl, { signal: AbortSignal.timeout(5000) });
-  assert.equal(bundle.status, 200);
-  assert.match(bundle.headers.get("content-type") ?? "", /javascript/);
-  assert((await bundle.text()).length > 100, "Control UI bundle is empty");
-  console.log(`Image gateway ready; Control UI and ${assetUrl.pathname} served successfully`);
+  const manifest = JSON.parse(
+    docker("exec", name, "cat", "/app/dist/control-ui/asset-manifest.json"),
+  );
+  const count = await verifyUiAssets({ base, html, manifest });
+  console.log(`Image gateway ready; Control UI and ${count} JS/CSS assets match the built image`);
 } catch (error) {
   try {
     console.error(docker("logs", "--tail", "100", name).replaceAll(token, "[smoke-token]"));

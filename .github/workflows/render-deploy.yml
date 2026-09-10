@@ -149,7 +149,7 @@ jobs:
       - name: Test deployment helper
         id: test_deployment
         continue-on-error: true
-        run: node --test pipeline/deploy/render/deploy.test.mjs
+        run: node --test pipeline/deploy/render/deploy.test.mjs pipeline/deploy/render/verify-ui-assets.test.mjs
       # Keep plugin invocations separate: mixed core/plugin filters can select
       # only core projects in the upstream test router.
       - name: Test Workboard

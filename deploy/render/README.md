@@ -56,7 +56,8 @@ Before an upgrade deployment:
 
 The disposable image smoke checks the actual OpenClaw CLI version, build commit,
 managed Codex CLI against its installed package version, non-root user, gateway
-`/readyz`, and a served Control UI JavaScript asset.
+`/readyz`, and every emitted Control UI JavaScript/CSS asset against the image's
+build-owned size and SHA256 manifest (including tiny entry modules).
 Render's `live` state plus matching image digest proves the image rollout. The
 public wrapper `/healthz` only checks its socket/tunnel startup and cannot prove
 the real gateway or an agent is working. The workflow does not claim that proof.
