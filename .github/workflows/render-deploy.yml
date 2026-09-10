@@ -203,6 +203,7 @@ jobs:
           pnpm test
           ui/src/pages/agents/auth-pins.test.ts
           ui/src/pages/agents/agents-page.test.ts
+          ui/src/pages/agents/agents-subscription-setup.test.ts
           ui/src/pages/agents/panels-overview.test.ts
           ui/src/components/modal-dialog.test.ts
           extensions/workboard/browser/lib/workboard/index.test.ts
