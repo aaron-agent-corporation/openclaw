@@ -74,7 +74,7 @@ Render restarts and any operator-approved rollback; do not delete them as part
 of routine cleanup. The temporary Actions image artifact expires after one day.
 
 The helper records the previous configured and live image metadata, patches the
-service's persistent image, then sends one deploy request and polls for up to
+service's persistent image, then requests a deployment of that verified setting and polls for up to
 20 minutes. Concurrent runs are serialized; a separate active Render deployment
 blocks a new one. Network failures during writes have unknown outcomes: inspect
 Render before rerunning. A timeout may still complete later. Failure never
@@ -86,7 +86,9 @@ API contracts: [update service](https://api-docs.render.com/reference/update-ser
 [retrieve deploy](https://api-docs.render.com/reference/retrieve-deploy), and
 [image deployment requirements](https://render.com/docs/deploying-an-image).
 PATCH does not trigger deployment; the helper preserves the service owner and
-registry credential when changing its image.
+registry credential when changing its image. The deploy request omits the optional
+`imageUrl` override: its separate lookup rejected a valid ECR digest in live use,
+while requesting the same digest from the persistent setting was accepted.
 
 Local helper checks: `node --test deploy/render/deploy.test.mjs`. A real image
 smoke needs Docker and a fully built image:

@@ -61,6 +61,13 @@ function fixture({
           service = { ...service, imagePath: JSON.parse(options.body).image.imagePath };
           data = service;
         } else if (options.method === "POST") {
+          if (Object.hasOwn(JSON.parse(options.body), "imageUrl"))
+            return new Response(
+              JSON.stringify({ message: "lookup error: image could not be fetched" }),
+              {
+                status: 400,
+              },
+            );
           if (failPost) throw new Error("Lost response after server may have accepted the write");
           data = { id: "new-deploy" };
         } else if (url.endsWith("/deploys/new-deploy"))
@@ -84,7 +91,7 @@ test("stages the digest, preserves registry credential, deploys once, and verifi
           image: { imagePath: image, ownerId: "owner-1", registryCredentialId: "credential-1" },
         },
       },
-      { method: "POST", body: { imageUrl: image, clearCache: "do_not_clear" } },
+      { method: "POST", body: { clearCache: "do_not_clear" } },
     ],
   );
   assert(messages.some((message) => message.includes("gateway:previous")));

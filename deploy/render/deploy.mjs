@@ -115,8 +115,9 @@ export async function deployRender({
       "Render did not retain the requested image; inspect service settings before retrying",
     );
   await requireCurrentMain();
+  // Image-backed deploys default to the verified persistent image. Avoid the
+  // separate imageUrl lookup, which rejected valid ECR digests in live use.
   const deployment = await render("/deploys", "POST", {
-    imageUrl: image,
     clearCache: "do_not_clear",
   });
   if (!deployment.id)
