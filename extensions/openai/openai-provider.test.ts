@@ -1397,7 +1397,7 @@ describe("buildOpenAIProvider", () => {
     },
   );
 
-  it.each(["gpt-5.5", "gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna"])(
+  it.each(["gpt-6-astra", "gpt-5.5", "gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna"])(
     "prefers auth-aware Codex runtime metadata for %s over static OpenAI catalog rows",
     (modelId) => {
       const provider = buildOpenAIProvider();
@@ -1410,6 +1410,52 @@ describe("buildOpenAIProvider", () => {
       ).toBe(true);
     },
   );
+
+  it("stamps the pinned Codex client version on ChatGPT-transport rows only", () => {
+    const provider = buildOpenAIProvider();
+    const pinnedVersion = readPinnedCodexClientVersion();
+    const codexRow = {
+      provider: "openai",
+      id: "gpt-6-astra",
+      name: "gpt-6-astra",
+      api: "openai-chatgpt-responses",
+      baseUrl: "https://chatgpt.com/backend-api/codex",
+      headers: { "x-custom": "1" },
+    };
+    // The backend rejects newer models unless the request carries the managed
+    // harness version, and operator headers must survive the stamp.
+    const stampedRow = provider.normalizeResolvedModel?.({
+      provider: "openai",
+      modelId: "gpt-6-astra",
+      model: codexRow,
+    } as never);
+    expect(stampedRow).toMatchObject({
+      input: ["text", "image"],
+      headers: { "x-custom": "1", version: pinnedVersion },
+    });
+    // Re-normalizing an already-stamped row is a no-op, so the hook stays stable.
+    expect(
+      provider.normalizeResolvedModel?.({
+        provider: "openai",
+        modelId: "gpt-6-astra",
+        model: stampedRow,
+      } as never),
+    ).toBeUndefined();
+    const platformRow = {
+      provider: "openai",
+      id: "gpt-6-astra",
+      name: "gpt-6-astra",
+      api: "openai-responses",
+      baseUrl: "https://api.openai.com/v1",
+    };
+    expect(
+      provider.normalizeResolvedModel?.({
+        provider: "openai",
+        modelId: "gpt-6-astra",
+        model: platformRow,
+      } as never)?.headers,
+    ).toBeUndefined();
+  });
 
   it("normalizes legacy OpenAI Codex hook aliases through the Codex transport", () => {
     const provider = buildOpenAIProvider();

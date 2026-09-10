@@ -4,7 +4,9 @@ import type {
   AgentIdentityResult,
   AgentsFilesListResult,
   AgentsListResult,
+  ModelAuthStatusResult,
   ModelCatalogEntry,
+  SystemAgentSetupDetectResult,
 } from "../../api/types.ts";
 import { renderModelPicker } from "../../components/model-picker.ts";
 import "../../components/multi-select-registration.ts";
@@ -29,6 +31,13 @@ import {
 } from "../../lib/agents/display.ts";
 import type { AgentsPanel } from "../../lib/agents/index.ts";
 import { deriveAvatarInitial, resolveAgentAvatarUrl } from "../../lib/avatar.ts";
+import { renderAgentAuthPinsPanel } from "./auth-pins-panel.ts";
+import {
+  collectPinnedProviderIds,
+  modelNeedsAuthPinHint,
+  orderModelOptionsForAuthPins,
+  type AgentAuthPinDraft,
+} from "./auth-pins.ts";
 
 export type AgentIdentityDraft = {
   name: string | null;
@@ -55,6 +64,14 @@ export function renderAgentOverview(params: {
   configDirty: boolean;
   modelCatalog: ModelCatalogEntry[];
   modelCatalogStatus: PanelRefreshStatus;
+  authStatus: ModelAuthStatusResult | null;
+  authStatusError: string | null;
+  authPinDrafts: readonly AgentAuthPinDraft[];
+  subscriptionPanel: "closed" | "pick" | "api-key";
+  setupDetect: SystemAgentSetupDetectResult | null;
+  apiKeyProviderId: string;
+  apiKeyValue: string;
+  subscriptionBusy: boolean;
   onConfigReload: () => void;
   onConfigSave: () => void;
   onIdentityFieldChange: (field: "name" | "emoji", value: string) => void;
@@ -63,6 +80,16 @@ export function renderAgentOverview(params: {
   onModelChange: (agentId: string, modelId: string | null) => void;
   onModelFallbacksChange: (agentId: string, fallbacks: string[]) => void;
   onModelCatalogOpen: () => void;
+  onAuthProfilesChange: (agentId: string, profiles: Record<string, string>) => void;
+  onAuthPinDraftsChange: (drafts: AgentAuthPinDraft[]) => void;
+  onOpenSubscriptionPanel: () => void;
+  onCloseSubscriptionPanel: () => void;
+  onStartAuthSubscription: (authChoiceId: string, providerHint?: string | null) => void;
+  onShowApiKeyForm: () => void;
+  onApiKeyProviderChange: (providerId: string) => void;
+  onApiKeyValueChange: (value: string) => void;
+  onSaveApiKeySubscription: () => void;
+  onAuthStatusRetry: () => void;
   onSelectPanel: (panel: AgentsPanel) => void;
 }) {
   const {
@@ -76,6 +103,7 @@ export function renderAgentOverview(params: {
     onConfigSave,
     onModelChange,
     onModelFallbacksChange,
+    onAuthProfilesChange,
     onSelectPanel,
   } = params;
   const context = buildAgentContext(
@@ -102,6 +130,14 @@ export function renderAgentOverview(params: {
   const fallbackChips = modelFallbacks ?? [];
   const disabled = !params.canUpdateConfig || !configForm || configLoading || configSaving;
   const thinkingDefault = agent.thinkingDefault ?? "-";
+  const authProfiles = { ...(config.entry?.auth?.profiles ?? {}) };
+  const pinnedProviders = collectPinnedProviderIds(authProfiles);
+  const modelOptions = orderModelOptionsForAuthPins(
+    buildModelOptions(configForm, effectivePrimary ?? undefined, params.modelCatalog, agent.id),
+    pinnedProviders,
+    t("agents.overview.authPinModelOtherProviders"),
+  );
+  const showAuthPinModelHint = modelNeedsAuthPinHint(selectedPrimary, pinnedProviders);
 
   const identityDraft = params.identityDraft;
   const identityName =
@@ -275,31 +311,33 @@ export function renderAgentOverview(params: {
           title: isDefault
             ? t("agents.overview.primaryModelDefault")
             : t("agents.overview.primaryModel"),
-          control: renderModelPicker({
-            label: isDefault
-              ? t("agents.overview.primaryModelDefault")
-              : t("agents.overview.primaryModel"),
-            value: selectedPrimary ?? "",
-            options: [
-              {
-                value: "",
-                label: isDefault
-                  ? t("agents.overview.notSet")
-                  : defaultPrimary
-                    ? t("agents.overview.inheritDefaultModel", { model: defaultPrimary })
-                    : t("agents.overview.inheritDefault"),
-              },
-              ...buildModelOptions(
-                configForm,
-                effectivePrimary ?? undefined,
-                params.modelCatalog,
-                agent.id,
-              ),
-            ],
-            disabled,
-            onChange: (value) => onModelChange(agent.id, value || null),
-            onOpen: params.onModelCatalogOpen,
-          }),
+          control: html`
+            ${renderModelPicker({
+              label: isDefault
+                ? t("agents.overview.primaryModelDefault")
+                : t("agents.overview.primaryModel"),
+              value: selectedPrimary ?? "",
+              options: [
+                {
+                  value: "",
+                  label: isDefault
+                    ? t("agents.overview.notSet")
+                    : defaultPrimary
+                      ? t("agents.overview.inheritDefaultModel", { model: defaultPrimary })
+                      : t("agents.overview.inheritDefault"),
+                },
+                ...modelOptions,
+              ],
+              disabled,
+              onChange: (value) => onModelChange(agent.id, value || null),
+              onOpen: params.onModelCatalogOpen,
+            })}
+            ${
+              showAuthPinModelHint
+                ? html`<p class="agent-auth-pin-hint">${t("agents.overview.authPinModelHint")}</p>`
+                : nothing
+            }
+          `,
         })}
         ${renderSettingsRow({
           title: t("agents.overview.fallbacks"),
@@ -318,6 +356,35 @@ export function renderAgentOverview(params: {
               .onOpen=${params.onModelCatalogOpen}
             ></openclaw-multi-select>
           `,
+        })}
+        ${renderSettingsRow({
+          title: t("agents.overview.authPins"),
+          stacked: true,
+          help: t("agents.overview.authPinsHelp"),
+          control: renderAgentAuthPinsPanel({
+            agentId: agent.id,
+            authProfiles,
+            drafts: params.authPinDrafts,
+            authStatus: params.authStatus,
+            authStatusError: params.authStatusError,
+            disabled,
+            subscriptionPanel: params.subscriptionPanel,
+            authOptions: params.setupDetect?.authOptions ?? [],
+            manualProviders: params.setupDetect?.manualProviders ?? [],
+            apiKeyProviderId: params.apiKeyProviderId,
+            apiKeyValue: params.apiKeyValue,
+            subscriptionBusy: params.subscriptionBusy,
+            onAuthProfilesChange,
+            onDraftsChange: params.onAuthPinDraftsChange,
+            onOpenSubscriptionPanel: params.onOpenSubscriptionPanel,
+            onCloseSubscriptionPanel: params.onCloseSubscriptionPanel,
+            onStartAuth: params.onStartAuthSubscription,
+            onShowApiKeyForm: params.onShowApiKeyForm,
+            onApiKeyProviderChange: params.onApiKeyProviderChange,
+            onApiKeyValueChange: params.onApiKeyValueChange,
+            onSaveApiKey: params.onSaveApiKeySubscription,
+            onAuthStatusRetry: params.onAuthStatusRetry,
+          }),
         })}
       `,
     )}

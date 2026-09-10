@@ -31,6 +31,8 @@ export type ModelAuthStatusProfile = {
   displayName?: string;
   email?: string;
   lastUsedAt?: number;
+  /** Agent ids that pin this profile via agents.entries.<id>.auth.profiles. */
+  pinnedByAgentIds?: string[];
 };
 
 export type ModelAuthStatusProvider = {

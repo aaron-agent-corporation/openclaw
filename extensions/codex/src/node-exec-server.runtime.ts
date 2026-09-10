@@ -21,7 +21,7 @@ import { closeCodexAppServerTransportAndWait } from "./app-server/transport.js";
 
 const MAX_CODEX_EXEC_SERVER_MESSAGE_BYTES = 64 * 1024 * 1024;
 const MAX_CODEX_EXEC_SERVER_STDERR_BYTES = 4 * 1024;
-// Pinned Codex 0.153.4 transport.rs:149 emits this before reading the one-shot
+// Pinned Codex 0.154.0-alpha.11 transport.rs:149 emits this before reading the one-shot
 // initialize request. Its package integration test guards this internal contract.
 const CODEX_EXEC_SERVER_READY_LINE =
   "codex_exec_server::server::transport: codex-exec-server listening on stdio";

@@ -26,6 +26,7 @@ import {
   retryBudgetExhausted,
   shouldSkipPersistedLifecycleStatusUpdate,
   shouldSyncWorkboardLifecycleStatus,
+  WorkboardStartGateRefusedError,
 } from "./store-card-helpers.js";
 import {
   isWorkboardClaimReclaimable,
@@ -35,6 +36,7 @@ import {
 import type {
   WorkboardBulkInput,
   WorkboardCardPatch,
+  WorkboardClaimOptions,
   WorkboardDiagnosticsResult,
   WorkboardDispatchOptions,
   WorkboardDispatchResult,
@@ -195,9 +197,18 @@ export class WorkboardStore extends WorkboardNotificationStore {
       requestedSessionKey: string;
       now: number;
       scope: WorkboardMutationScope;
+      /** Same trusted gate as claim; re-evaluated here because this is the last write before launch. */
+      startGate?: WorkboardClaimOptions["startGate"];
     },
   ): Promise<{ card: WorkboardCard; launch: WorkboardPreparedLaunch }> {
     return await this.enqueueMutation(async () => {
+      if (input.startGate) {
+        const current = await this.get(id);
+        const board = current ? await this.boardStore.lookup(cardBoardId(current)) : undefined;
+        if (!input.startGate(board?.version === 1 ? board.board : undefined)) {
+          throw new WorkboardStartGateRefusedError();
+        }
+      }
       const result = await this.updateLatestCard(
         id,
         (card) => {
@@ -273,7 +284,7 @@ export class WorkboardStore extends WorkboardNotificationStore {
   async failPreparedLaunch(
     id: string,
     input: { expectedLaunch: WorkboardPreparedLaunch; reason: string; failedAt: number },
-  ): Promise<boolean> {
+  ): Promise<WorkboardCard | undefined> {
     const failedAt = Math.max(input.failedAt, input.expectedLaunch.preparedAt);
     const reason = capText(input.reason, 2000) ?? "Dispatcher could not start worker.";
     const launchReason = capText(reason, 800) ?? "Prepared launch failed.";
@@ -305,7 +316,9 @@ export class WorkboardStore extends WorkboardNotificationStore {
         },
         { allowAutomationLaunch: true },
       );
-      return result.updated;
+      // The exact written version lets dispatch callers tell this write apart
+      // from a concurrent operator repair of the same card.
+      return result.updated ? result.card : undefined;
     });
   }
 
@@ -388,6 +401,12 @@ export class WorkboardStore extends WorkboardNotificationStore {
               status: input.executionStatus,
               updatedAt: input.now,
             };
+          }
+          // A worker whose session failed can no longer heartbeat or release its
+          // claim. Drop it here so the owner's lane frees for the next Ready card
+          // instead of staying busy until the claim TTL runs out.
+          if (associationIsCurrent && input.executionStatus === "blocked" && card.metadata?.claim) {
+            metadata = { ...metadata, claim: undefined };
           }
           if (associationIsCurrent && input.stale) {
             const existing = card.metadata?.stale;

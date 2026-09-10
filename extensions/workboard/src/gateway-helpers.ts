@@ -1,4 +1,8 @@
-import { WORKBOARD_STATUSES, type WorkboardCard } from "@openclaw/workboard-contract";
+import {
+  WORKBOARD_STATUSES,
+  type WorkboardBoardSummary,
+  type WorkboardCard,
+} from "@openclaw/workboard-contract";
 // Workboard plugin module implements shared gateway request helpers.
 import { formatErrorMessage } from "openclaw/plugin-sdk/error-runtime";
 import { parseStrictPositiveInteger } from "openclaw/plugin-sdk/number-runtime";
@@ -89,9 +93,16 @@ export async function listWorkboardCards(
   store: WorkboardStore,
   boardId: unknown,
   redactCard: (card: WorkboardCard) => WorkboardCard,
+  describeBoards: (boards: WorkboardBoardSummary[]) => WorkboardBoardSummary[] = (boards) => boards,
 ) {
   const [cards, { boards }] = await Promise.all([store.list({ boardId }), store.listBoards()]);
-  return { cards: cards.map(redactCard), boards, statuses: WORKBOARD_STATUSES };
+  // The Control UI replaces its board catalog with this payload, so it must
+  // carry the same auto-advance status as workboard.boards.list.
+  return {
+    cards: cards.map(redactCard),
+    boards: describeBoards(boards),
+    statuses: WORKBOARD_STATUSES,
+  };
 }
 
 export function resolveGatewayWorkboardWorkspaceAccess(params: {
@@ -113,33 +124,34 @@ export function resolveGatewayWorkboardWorkspaceAccess(params: {
   });
 }
 
-function gatewayDispatchOptions(params: {
+type WorkboardHostConfig = Parameters<typeof resolveWorkboardAgentWorkspace>[0];
+
+// Shared by operator-invoked gateway dispatch and Gateway-owned auto-advance so
+// both launch workers through the same workspace, sandbox, and worktree checks.
+export function workboardHostDispatchOptions(params: {
   api: OpenClawPluginApi;
-  request: Pick<GatewayMethodContext, "client" | "context">;
-  input: Pick<
+  config: () => WorkboardHostConfig;
+  workspaceAccess: WorkboardWorkspaceAccess;
+  input?: Pick<
     WorkboardDispatchStartOptions,
-    "boardId" | "cardId" | "maxStarts" | "provider" | "model"
+    "boardId" | "cardId" | "maxStarts" | "provider" | "model" | "now"
   >;
 }): WorkboardDispatchStartOptions {
-  const { context, client } = params.request;
   return {
     ...params.input,
     materializeWorktree: true,
-    resolveAgentWorkspace: (agentId) =>
-      resolveWorkboardAgentWorkspace(context.getRuntimeConfig(), agentId),
-    resolveAgentWorkspaceRuntime: (agentId, sessionKey, workspaceDir, modelProvider, modelId) => {
-      const config = context.getRuntimeConfig();
-      return resolveAgentWorkboardWorkspaceRuntime({
-        config,
+    resolveAgentWorkspace: (agentId) => resolveWorkboardAgentWorkspace(params.config(), agentId),
+    resolveAgentWorkspaceRuntime: (agentId, sessionKey, workspaceDir, modelProvider, modelId) =>
+      resolveAgentWorkboardWorkspaceRuntime({
+        config: params.config(),
         agentId,
         sessionKey,
         workspaceDir,
         modelProvider,
         modelId,
         prepareSandboxWorkspaceAuthority: params.api.runtime.sandbox.prepareWorkspaceAuthority,
-      });
-    },
-    workspaceAccess: resolveGatewayWorkboardWorkspaceAccess({ context, client }),
+      }),
+    workspaceAccess: params.workspaceAccess,
   };
 }
 
@@ -182,9 +194,10 @@ export function createWorkboardDispatchHandler(params: {
         store: params.store,
         subagent: params.api.runtime.subagent,
         worktrees: params.api.runtime.worktrees,
-        options: gatewayDispatchOptions({
+        options: workboardHostDispatchOptions({
           api: params.api,
-          request: { context, client },
+          config: () => context.getRuntimeConfig(),
+          workspaceAccess: resolveGatewayWorkboardWorkspaceAccess({ context, client }),
           input: {
             ...(cardId ? { cardId, maxStarts: 1 } : {}),
             boardId: typeof boardId === "string" ? boardId : undefined,
@@ -204,6 +217,14 @@ export function createWorkboardDispatchHandler(params: {
       }
       respond(true, {
         ...result,
+        started: result.started.map((run) => ({
+          ...run,
+          ...(run.card ? { card: params.redactCard(run.card) } : {}),
+        })),
+        startFailures: result.startFailures.map((failure) => ({
+          ...failure,
+          ...(failure.card ? { card: params.redactCard(failure.card) } : {}),
+        })),
         promoted: result.promoted.map(params.redactCard),
         reclaimed: result.reclaimed.map(params.redactCard),
         blocked: result.blocked.map(params.redactCard),

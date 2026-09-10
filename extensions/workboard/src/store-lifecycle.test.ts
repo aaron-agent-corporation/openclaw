@@ -1,5 +1,7 @@
 import { createDeferred } from "openclaw/plugin-sdk/extension-shared";
 import { describe, expect, it, vi } from "vitest";
+import { createWorkboardAutoAdvanceService } from "./auto-advance.js";
+import { dispatchAndStartWorkboardCards } from "./dispatcher.js";
 import { createWorkboardLifecycleService } from "./lifecycle-sync.js";
 import type { PersistedWorkboardCard, WorkboardKeyedStore } from "./persistence-types.js";
 import { WorkboardStore } from "./store.js";
@@ -170,6 +172,69 @@ describe("Workboard store lifetime", () => {
       resume.resolve();
       service.onGatewayStop();
       await service.stop?.(context);
+      await store.close();
+    }
+  });
+
+  it("drains an accepted automatic launch before closing and starts no further workers", async () => {
+    const entered = createDeferred<void>();
+    const resume = createDeferred<void>();
+    const persistence = memoryStore();
+    const close = vi.fn();
+    const store = new WorkboardStore(persistence, { close });
+    await store.upsertBoard({ id: "ops", orchestration: { autoAdvance: true } });
+    const first = await store.create({
+      title: "Accepted worker",
+      boardId: "ops",
+      status: "ready",
+      agentId: "first",
+      workspaceAccess: { unrestricted: true },
+    });
+    const second = await store.create({
+      title: "Still queued",
+      boardId: "ops",
+      status: "ready",
+      agentId: "second",
+      workspaceAccess: { unrestricted: true },
+    });
+    const run = vi.fn(async () => {
+      entered.resolve();
+      await resume.promise;
+      return { runId: "accepted-run" };
+    });
+    const service = createWorkboardAutoAdvanceService({
+      store,
+      dispatch: ({ boardId, now, startGate }) =>
+        dispatchAndStartWorkboardCards({
+          store,
+          subagent: { run },
+          options: { boardId, now, startGate, workspaceAccess: { unrestricted: true } },
+        }),
+    });
+    const logger = { info: vi.fn(), warn: vi.fn() };
+    await service.start({ logger } as never);
+    service.onLifecycleSweep();
+    const passing = service.settle();
+    try {
+      await entered.promise;
+      service.stop();
+      const closing = store.close();
+      await Promise.resolve();
+      expect(close).not.toHaveBeenCalled();
+      resume.resolve();
+      await passing;
+      await closing;
+      expect(close).toHaveBeenCalledOnce();
+      expect(run).toHaveBeenCalledOnce();
+      expect(await persistence.lookup(first.id)).toMatchObject({
+        card: { status: "running", runId: "accepted-run" },
+      });
+      expect(await persistence.lookup(second.id)).toMatchObject({ card: { status: "ready" } });
+      expect(logger.warn).not.toHaveBeenCalled();
+    } finally {
+      resume.resolve();
+      service.stop();
+      await passing;
       await store.close();
     }
   });

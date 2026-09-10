@@ -223,6 +223,10 @@ export const SessionRowSchema = Type.Object(
     /** Runtime model serving this session while it differs from the selected model. */
     activeModel: Type.Optional(Type.String()),
     activeModelProvider: Type.Optional(Type.String()),
+    /** Effective auth profile id for this session (user pin, model @profile, or agent pin). */
+    authProfileId: Type.Optional(Type.String()),
+    /** Operator-facing auth profile label for this session. */
+    authProfileLabel: Type.Optional(Type.String()),
     /** Persisted override provenance; null means inherited, omission means not projected. */
     modelOverrideSource: Type.Optional(
       Type.Union([Type.Literal("user"), Type.Literal("auto"), Type.Null()]),

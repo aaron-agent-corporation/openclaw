@@ -7,7 +7,9 @@ const CALLBACK_PORT = 1455;
 const CALLBACK_PATH = "/auth/callback";
 const DEFAULT_CALLBACK_HOST = "localhost";
 const LOOPBACK_CALLBACK_HOSTS = new Set(["localhost", "127.0.0.1", "::1"]);
-const SCOPE = "openid profile email offline_access";
+// Match the managed Codex login scopes so both clients request the same
+// connector access (codex-rs/login/src/server.rs build_authorize_url).
+const SCOPE = "openid profile email offline_access api.connectors.read api.connectors.invoke";
 
 const loadNodeCrypto = createLazyRuntimeModule(() =>
   import("node:crypto").then((cryptoModule) => cryptoModule.randomBytes),

@@ -2,6 +2,7 @@ import { vi } from "vitest";
 import type { GatewayBrowserClient } from "../../api/gateway.ts";
 import type {
   AgentsFilesListResult,
+  ModelAuthStatusResult,
   ModelCatalogEntry,
   ToolsEffectiveResult,
 } from "../../api/types.ts";
@@ -33,6 +34,7 @@ export type TestAgentsPage = HTMLElement & {
   toolsEffectiveLoading: boolean;
   toolsEffectiveResult: ToolsEffectiveResult | null;
   chatModelCatalog: ModelCatalogEntry[];
+  modelAuthStatus: ModelAuthStatusResult | null;
   chatModelCatalogStatus: PanelRefreshStatus;
   cron: CronState;
   requestGeneration: number;

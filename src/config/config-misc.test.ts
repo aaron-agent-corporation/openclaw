@@ -1284,6 +1284,31 @@ describe("config strict validation", () => {
     }
   });
 
+  it("accepts agents.entries.*.auth.profiles provider pins", () => {
+    const res = validateConfigObject({
+      agents: {
+        entries: {
+          researcher: {
+            auth: {
+              profiles: {
+                openai: "openai:household",
+                anthropic: "anthropic:work",
+              },
+            },
+          },
+        },
+      },
+    });
+
+    expect(res.ok).toBe(true);
+    if (res.ok) {
+      expect(res.config.agents?.list?.[0]?.auth?.profiles).toEqual({
+        openai: "openai:household",
+        anthropic: "anthropic:work",
+      });
+    }
+  });
+
   it("rejects top-level memorySearch without read-time auto-migration", async () => {
     await withTempHome(async (home) => {
       await writeOpenClawConfig(home, {

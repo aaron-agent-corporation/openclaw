@@ -3,6 +3,11 @@
  * Keep external callers on these exported contracts instead of deep
  * auth-profile implementation files.
  */
+export {
+  indexAgentAuthProfilePins,
+  resolveAgentAuthProfilePin,
+  resolveConfiguredAuthProfileId,
+} from "./auth-profiles/agent-configured-profile.js";
 export { CLAUDE_CLI_PROFILE_ID, CODEX_CLI_PROFILE_ID } from "./auth-profiles/constants.js";
 export type {
   AuthCredentialReasonCode,

@@ -188,7 +188,7 @@ Behavior notes for local/proxied `/v1` backends:
 
 - OpenClaw treats these as proxy-style OpenAI-compatible routes, not native OpenAI endpoints.
 - Native-OpenAI-only request shaping does not apply: no `service_tier`, no Responses `store`, no OpenAI reasoning-compat payload shaping, no prompt-cache hints.
-- Hidden OpenClaw attribution headers (`originator`, `version`, `User-Agent`) are not injected on custom proxy URLs.
+- Hidden OpenClaw attribution headers (`originator`, `User-Agent`) are not injected on custom proxy URLs.
 
 Compat declarations are only for the custom endpoint described by this provider row. Catalog-known routes use provider-owned capabilities instead; see the [custom-provider capability guide](/gateway/config-tools#custom-provider-capability-declarations).
 

@@ -20,6 +20,7 @@ import {
   moveWorkboardCard,
   refreshWorkboard,
   saveWorkboardCardDraft,
+  setWorkboardBoardAutoAdvance,
   startWorkboardCard,
   stopWorkboardLifecycleRefresh,
   stopWorkboardCard,
@@ -439,6 +440,15 @@ describe("workboard controller", () => {
               id: "default",
               name: "Inbox",
               automationJobId: "job-categorize-inbox",
+              orchestration: { autoAdvance: true, defaultAssignee: "ignored-in-ui" },
+              autoAdvance: {
+                enabled: true,
+                lastPassAt: 9,
+                idleReason: "No Ready cards are waiting.",
+                lastFailure: { error: "provider outage", at: 8, cardId: "card-1", title: "Fix" },
+                retryAt: 70,
+                unknown: "dropped",
+              },
               total: 1,
               active: 1,
               archived: 0,
@@ -471,6 +481,14 @@ describe("workboard controller", () => {
           id: "default",
           name: "Inbox",
           automationJobId: "job-categorize-inbox",
+          orchestration: { autoAdvance: true },
+          autoAdvance: {
+            enabled: true,
+            lastPassAt: 9,
+            idleReason: "No Ready cards are waiting.",
+            lastFailure: { error: "provider outage", at: 8, cardId: "card-1", title: "Fix" },
+            retryAt: 70,
+          },
           total: 1,
           active: 1,
           archived: 0,
@@ -1899,11 +1917,13 @@ describe("workboard controller", () => {
     expect(getWorkboardState(host).draggedCardId).toBeNull();
   });
 
-  it.each(["card write", "dispatch"] as const)(
+  it.each(["card write", "board settings", "dispatch"] as const)(
     "does not refresh while a %s is active",
     async (mutation) => {
       if (mutation === "card write") {
         state.busyCardIds.add(sampleCard.id);
+      } else if (mutation === "board settings") {
+        state.boardSettingsSaving = true;
       } else {
         state.dispatching = true;
       }
@@ -1920,6 +1940,46 @@ describe("workboard controller", () => {
       }
     },
   );
+
+  it("does not let an earlier refresh undo a saved board auto-advance setting", async () => {
+    const board = {
+      id: "ops",
+      total: 0,
+      active: 0,
+      archived: 0,
+      byStatus: {},
+      orchestration: { autoAdvance: true },
+    };
+    state.boards = [board];
+    const stale = createDeferred<unknown>();
+    const client = createClient((method) => {
+      if (method === "workboard.cards.list") {
+        return stale.promise;
+      }
+      if (method === "workboard.boards.list") {
+        return { boards: [{ ...board, orchestration: { autoAdvance: false } }] };
+      }
+      return {};
+    });
+    const refreshing = loadBoard(client);
+    await waitForFast(() => expect(requestCalls(client, "workboard.cards.list")).toHaveLength(1));
+    await expect(
+      setWorkboardBoardAutoAdvance({
+        host,
+        client: client as never,
+        boardId: "ops",
+        enabled: false,
+      }),
+    ).resolves.toBe(true);
+    stale.resolve({ cards: [], boards: [board] });
+    await refreshing;
+
+    expect(state.boards[0]?.orchestration?.autoAdvance).toBe(false);
+    expect(client.request).toHaveBeenCalledWith("workboard.boards.upsert", {
+      id: "ops",
+      orchestration: { autoAdvance: false },
+    });
+  });
 
   it("clears stale task summaries when dispatch task refresh fails", async () => {
     state.tasksByCardId.set("card-1", sampleTask);

@@ -1,4 +1,5 @@
 import type {
+  WorkboardBoardMetadata,
   WorkboardBoardSummary,
   WorkboardCard,
   WorkboardDiagnostic,
@@ -96,6 +97,11 @@ export type WorkboardClaimOptions = {
   };
   /** Trusted legacy-card adoption; applied only while expectedAuthority still matches. */
   adoptWorkspaceAccess?: WorkboardWorkspaceAccess;
+  /**
+   * Trusted dispatcher gate evaluated on the card's board row inside the claim
+   * mutation, so a concurrent board opt-out or Gateway stop wins atomically.
+   */
+  startGate?: (board: WorkboardBoardMetadata | undefined) => boolean;
 };
 export type WorkboardHeartbeatInput = {
   token?: unknown;

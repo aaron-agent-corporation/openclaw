@@ -349,7 +349,7 @@ describe("GPT-Live offer broker", () => {
         "OpenAI-Alpha": "quicksilver=v2",
         "User-Agent": "openclaw/2026.7.2-test",
         originator: "openclaw",
-        version: "2026.7.2-test",
+
         "session-id": expect.any(String),
         "thread-id": expect.any(String),
         "x-session-id": expect.any(String),
@@ -360,12 +360,14 @@ describe("GPT-Live offer broker", () => {
         "OpenAI-Alpha": "quicksilver=v2",
         "User-Agent": "openclaw/2026.7.2-test",
         originator: "openclaw",
-        version: "2026.7.2-test",
+
         "session-id": signalingHeaders?.["session-id"],
         "thread-id": signalingHeaders?.["thread-id"],
         "x-session-id": signalingHeaders?.["x-session-id"],
       });
       expect(signalingHeaders?.["session-id"]).not.toBe(signalingHeaders?.["x-session-id"]);
+      expect(signalingHeaders).not.toHaveProperty("version");
+      expect(sideband?.headers).not.toHaveProperty("version");
       expect(signalingHeaders?.["thread-id"]).not.toBe(signalingHeaders?.["x-session-id"]);
       expect(signalingHeaders?.["thread-id"]).not.toBe(signalingHeaders?.["session-id"]);
       if (authCase.accountId) {

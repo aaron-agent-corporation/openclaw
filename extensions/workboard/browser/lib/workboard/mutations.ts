@@ -315,3 +315,36 @@ export async function dispatchWorkboard(params: {
     params.requestUpdate?.();
   }
 }
+
+export async function setWorkboardBoardAutoAdvance(params: {
+  host: WorkboardHost;
+  client: GatewayBrowserClient | null;
+  boardId: string;
+  enabled: boolean;
+  requestUpdate?: () => void;
+}): Promise<boolean> {
+  const state = getWorkboardState(params.host);
+  if (!params.client || !workboardMutationsReady(state) || state.boardSettingsSaving) {
+    return false;
+  }
+  invalidateWorkboardLoads(params.host);
+  state.boardSettingsSaving = true;
+  state.error = null;
+  params.requestUpdate?.();
+  try {
+    await params.client.request("workboard.boards.upsert", {
+      id: params.boardId,
+      orchestration: { autoAdvance: params.enabled },
+    });
+    state.boards = normalizeCardsPayload(
+      await params.client.request("workboard.boards.list", {}),
+    ).boards;
+    return true;
+  } catch (error) {
+    state.error = formatError(error);
+    return false;
+  } finally {
+    state.boardSettingsSaving = false;
+    params.requestUpdate?.();
+  }
+}

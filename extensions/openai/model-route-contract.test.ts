@@ -25,6 +25,7 @@ describe("OpenAI model route contract", () => {
     expect(normalizeOpenAIModelRouteId("future-model")).toBe("future-model");
     expect(normalizeOpenAIModelRouteId("GPT-5.4-CODEX")).toBe("gpt-5.4");
 
+    expect(isOpenAIDualRouteModelId("GPT-6-ASTRA")).toBe(true);
     expect(isOpenAIDualRouteModelId("GPT-5.5")).toBe(true);
     expect(isOpenAIDualRouteModelId("gpt-6-astra")).toBe(true);
     expect(isOpenAIPlatformOnlyRouteModelId("CHAT-LATEST")).toBe(true);

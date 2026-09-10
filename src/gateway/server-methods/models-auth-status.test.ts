@@ -649,6 +649,9 @@ describe("models.authStatus", () => {
   it.each([false, true])(
     "projects explicit priority with local reset ownership %s",
     async (localOrderStored) => {
+      mocks.getRuntimeConfig.mockReturnValue({
+        agents: { entries: { main: { auth: { profiles: { openai: "openai:default" } } } } },
+      });
       setPreparedAuthStore({
         version: 1,
         profiles: {
@@ -677,11 +680,15 @@ describe("models.authStatus", () => {
         email: "owner@example.com",
         lastUsedAt: 42,
         source: "saved",
+        pinnedByAgentIds: ["main"],
       });
     },
   );
 
   it("omits profile identity for read-only clients", async () => {
+    mocks.getRuntimeConfig.mockReturnValue({
+      agents: { entries: { main: { auth: { profiles: { openai: "openai:default" } } } } },
+    });
     setPreparedAuthStore({
       version: 1,
       profiles: {
@@ -706,6 +713,7 @@ describe("models.authStatus", () => {
     expect(result.providers[0]?.profiles[0]).not.toHaveProperty("email");
     expect(result.providers[0]?.profiles[0]).not.toHaveProperty("displayName");
     expect(result.providers[0]?.profiles[0]).not.toHaveProperty("lastUsedAt");
+    expect(result.providers[0]?.profiles[0]).not.toHaveProperty("pinnedByAgentIds");
   });
 
   it("marks externally supplied profiles and configuration-owned priority", async () => {

@@ -1,6 +1,7 @@
 // Workboard plugin module implements gateway behavior.
 import type { WorkboardCard } from "@openclaw/workboard-contract";
 import type { OpenClawPluginApi } from "../api.js";
+import type { WorkboardAutoAdvanceService } from "./auto-advance.js";
 import { redactClaimToken } from "./card-redaction.js";
 import {
   assertNoCursorAdvance,
@@ -39,8 +40,9 @@ async function redactCardResult(card: Promise<WorkboardCard>) {
 export function registerWorkboardGatewayMethods(params: {
   api: OpenClawPluginApi;
   store?: WorkboardStore;
+  autoAdvance?: Pick<WorkboardAutoAdvanceService, "describeBoards">;
 }) {
-  const { api: hostApi } = params;
+  const { api: hostApi, autoAdvance } = params;
   const store = params.store ?? WorkboardStore.openSqlite();
   if (!params.store) {
     registerWorkboardStoreLifecycle(hostApi, store);
@@ -71,7 +73,12 @@ export function registerWorkboardGatewayMethods(params: {
       "workboard.cards.list",
       READ_SCOPE,
       async ({ params: requestParams }) =>
-        await listWorkboardCards(store, requestParams.boardId, redactClaimToken),
+        await listWorkboardCards(
+          store,
+          requestParams.boardId,
+          redactClaimToken,
+          autoAdvance?.describeBoards,
+        ),
     ],
   ]);
 
@@ -218,7 +225,14 @@ export function registerWorkboardGatewayMethods(params: {
   );
 
   registerWorkboardResultMethods(api, [
-    ["workboard.boards.list", READ_SCOPE, () => store.listBoards()],
+    [
+      "workboard.boards.list",
+      READ_SCOPE,
+      async () => {
+        const { boards } = await store.listBoards();
+        return { boards: autoAdvance ? autoAdvance.describeBoards(boards) : boards };
+      },
+    ],
   ]);
 
   registerWorkboardWorkspaceBoardMethod({ api, store, redactCard: redactClaimToken });

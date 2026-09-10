@@ -161,11 +161,14 @@ function normalizeOrchestration(
     120,
     "orchestrator profile",
   );
+  const autoAdvance =
+    typeof record.autoAdvance === "boolean" ? record.autoAdvance : fallback?.autoAdvance;
   const next: WorkboardOrchestrationSettings = {
     ...(autoDecompose !== undefined ? { autoDecompose } : {}),
     ...(autoDecomposePerDispatch ? { autoDecomposePerDispatch } : {}),
     ...(defaultAssignee ? { defaultAssignee } : {}),
     ...(orchestratorProfile ? { orchestratorProfile } : {}),
+    ...(autoAdvance !== undefined ? { autoAdvance } : {}),
   };
   return Object.keys(next).length ? next : undefined;
 }

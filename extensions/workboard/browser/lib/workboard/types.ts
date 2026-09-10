@@ -91,6 +91,7 @@ export type WorkboardUiState = {
   missingTaskIds: Set<string>;
   lastDispatchSummary: WorkboardDispatchSummary | null;
   dispatching: boolean;
+  boardSettingsSaving: boolean;
   query: string;
   priorityFilter: "all" | WorkboardPriority;
   agentFilter: string;

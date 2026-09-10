@@ -373,6 +373,75 @@ it("releases listeners and stops refreshes when its mount is disposed", async ()
   expect(page.container.childElementCount).toBe(0);
 });
 
+describe("board auto-advance", () => {
+  it("shows queue status and saves the toggle through the authenticated host", async () => {
+    const page = mountPage({ boardId: "planning" });
+    const board = {
+      id: "planning",
+      total: 0,
+      active: 0,
+      archived: 0,
+      byStatus: {},
+      orchestration: { autoAdvance: true },
+      autoAdvance: {
+        enabled: true,
+        idleReason: "Waiting waits for main to finish Busy (running).",
+        lastFailure: { error: "provider outage", at: 5, title: "Fix" },
+      },
+    };
+    page.workboard.state.boards = [board];
+    const request = page.request.getMockImplementation()!;
+    page.request.mockImplementation(async (method) => {
+      if (method === "workboard.boards.upsert") {
+        board.orchestration.autoAdvance = false;
+        return { board };
+      }
+      if (method === "workboard.boards.list") {
+        return { boards: [board] };
+      }
+      if (method === "workboard.cards.list") {
+        return { cards: [], boards: [board] };
+      }
+      return request(method);
+    });
+    page.fixture.connection.connected = true;
+    page.fixture.notify();
+    await vi.waitFor(() => expect(page.workboard.state.loaded).toBe(true));
+
+    const toggle = expectDefined(
+      page.container.querySelector<HTMLButtonElement>(".workboard-auto-advance-toggle"),
+      "board auto-advance toggle",
+    );
+    expect(toggle.getAttribute("aria-pressed")).toBe("true");
+    expect(toggle.textContent?.trim()).toBe("Auto-advance on");
+    const status = page.container.querySelector(".workboard-auto-advance-status");
+    expect(status?.textContent).toContain("Waiting waits for main to finish Busy (running).");
+    expect(status?.textContent).toContain("Last start failure: Fix: provider outage");
+
+    toggle.click();
+
+    await vi.waitFor(() => expect(toggle.getAttribute("aria-pressed")).toBe("false"));
+    expect(page.request).toHaveBeenCalledWith("workboard.boards.upsert", {
+      id: "planning",
+      orchestration: { autoAdvance: false },
+    });
+    expect(page.container.querySelector(".workboard-auto-advance-status")).toBeNull();
+  });
+
+  it("hides auto-advance controls for a read-only manual board", async () => {
+    const page = mountPage({ boardId: "planning" });
+    page.fixture.connection.canWrite = false;
+    page.workboard.state.boards = [
+      { id: "planning", total: 0, active: 0, archived: 0, byStatus: {} },
+    ];
+    page.workboard.notify();
+    await Promise.resolve();
+
+    expect(page.container.querySelector(".workboard-auto-advance-toggle")).toBeNull();
+    expect(page.container.querySelector(".workboard-auto-advance-status")).toBeNull();
+  });
+});
+
 describe("selection reconciliation", () => {
   it.each(["scope", "board"] as const)(
     "preserves a submitted edit through %s changes and failed-save recovery",

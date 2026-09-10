@@ -291,9 +291,10 @@ describe("OpenAI realtime voice browser authentication", () => {
       Authorization: "Bearer test-api-key-test",
       "Content-Type": "application/json",
       originator: "openclaw",
-      version: "2026.3.22",
+
       "User-Agent": "openclaw/2026.3.22",
     });
+    expect(requireFetchHeaders()).not.toHaveProperty("version");
     const body = requireFetchJsonBody();
     const bodySession = requireRecord(body.session, "fetch session");
     expect(bodySession.model).toBe("gpt-realtime-2.1");
@@ -317,7 +318,7 @@ describe("OpenAI realtime voice browser authentication", () => {
       model: "gpt-realtime-2.1",
       expiresAt: 1_765_000_000_000,
     });
-    // originator, version, and User-Agent are server-side attribution headers; they
+    // originator and User-Agent are server-side attribution headers; they
     // must not be forwarded to the browser so that the browser's direct SDP POST to
     // api.openai.com passes the CORS preflight (only authorization,content-type
     // allowed — #76435). All three are filtered, leaving no browser offer headers.

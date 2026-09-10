@@ -82,6 +82,7 @@ When a selected stored profile is removed, credential-scoped model discovery rep
 - When `auth.order.<provider>` or the auth-store order override is set for a provider, `models status --probe` only probes profile ids that remain in the resolved auth order for that provider. The stored override wins over `auth.order` config.
 - A stored profile for that provider that is omitted from the explicit order is not silently tried later. Probe output reports it with `reasonCode: excluded_by_auth_order` and the detail `Excluded by auth.order for this provider.`
 - A valid session user pin is an explicit per-session exception: OpenClaw tries that profile first even when it is omitted from the provider order, then uses the ordered same-provider profiles as retry candidates. A cooldown or disabled window applies only to the affected profile; it does not suppress its eligible siblings.
+- Per-agent pins use `agents.entries.<id>.auth.profiles` (provider id → profile id). Resolution order for a turn is: session user or personal-account pin, model-ref `@profile` suffix, agent pin, then `auth.order` / store order. A missing or wrong-provider agent pin fails closed instead of falling through to another subscription.
 
 Prepared agent requests use their selected plugin metadata, configuration, workspace, and environment for auth profile eligibility, ordering, and environment credential evidence. An empty selected plugin set remains authoritative; another request’s plugin aliases cannot add profiles or change the credential owner.
 

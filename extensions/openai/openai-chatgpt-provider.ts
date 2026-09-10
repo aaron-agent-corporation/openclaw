@@ -28,6 +28,7 @@ import {
   isOpenAICodexBaseUrl,
   OPENAI_CODEX_RESPONSES_BASE_URL,
 } from "./base-url.js";
+import { OPENAI_CODEX_CLIENT_VERSION } from "./codex-client-version.js";
 import { OPENAI_CODEX_DEFAULT_MODEL } from "./default-models.js";
 import {
   OPENAI_CHATGPT_MODERN_MODEL_IDS,
@@ -107,6 +108,7 @@ const OPENAI_CODEX_GPT_55_PRO_TEMPLATE_MODEL_IDS = [
   ...OPENAI_CODEX_GPT_54_TEMPLATE_MODEL_IDS,
 ] as const;
 const OPENAI_CODEX_IMAGE_CAPABLE_MODEL_IDS = [
+  OPENAI_GPT_6_ASTRA_MODEL_ID,
   ...OPENAI_CODEX_GPT_56_MODEL_IDS,
   OPENAI_CODEX_GPT_55_MODEL_ID,
   OPENAI_CODEX_GPT_55_PRO_MODEL_ID,
@@ -163,7 +165,7 @@ function matchesOpenAICodexImageCapableModel(modelId: string, modelName?: string
 
 /**
  * Restore native `["text", "image"]` input capability on resolved Codex rows
- * for known image-capable modern model IDs (GPT-5.4 through GPT-5.6).
+ * for known image-capable modern model IDs.
  * Persisted/configured model rows can omit the `input` field
  * entirely when they were written by older OpenClaw versions. When that row wins
  * the catalog merge, `modelSupportsInput(entry, "image")` returns false and the
@@ -202,11 +204,18 @@ function normalizeCodexTransport(model: ProviderRuntimeModel): ProviderRuntimeMo
   });
   const api = normalizedTransport.api ?? model.api;
   const baseUrl = normalizedTransport.baseUrl ?? model.baseUrl;
+  // The ChatGPT backend gates newer models on the caller's Codex version, so
+  // every direct-transport row must carry the managed harness pin.
+  const headers =
+    api === "openai-chatgpt-responses" && model.headers?.version !== OPENAI_CODEX_CLIENT_VERSION
+      ? { ...model.headers, version: OPENAI_CODEX_CLIENT_VERSION }
+      : model.headers;
   if (
     api === model.api &&
     baseUrl === model.baseUrl &&
     canonicalModelId === model.id &&
-    canonicalName === model.name
+    canonicalName === model.name &&
+    headers === model.headers
   ) {
     return model;
   }
@@ -216,6 +225,7 @@ function normalizeCodexTransport(model: ProviderRuntimeModel): ProviderRuntimeMo
     name: canonicalName,
     api,
     baseUrl,
+    ...(headers ? { headers } : {}),
   };
 }
 

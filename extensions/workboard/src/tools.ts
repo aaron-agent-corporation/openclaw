@@ -4,6 +4,7 @@ import { jsonResult, readStringParam } from "openclaw/plugin-sdk/core";
 import type { AnyAgentTool, OpenClawPluginToolContext } from "openclaw/plugin-sdk/plugin-entry";
 import { safeEqualSecret } from "openclaw/plugin-sdk/security-runtime";
 import { Type } from "typebox";
+import type { WorkboardAutoAdvanceService } from "./auto-advance.js";
 import { redactClaimToken } from "./card-redaction.js";
 import type { WorkboardStore } from "./store.js";
 import {
@@ -169,6 +170,7 @@ const CardIdSchema = strictObject({
 export function createWorkboardTools(params: {
   context?: OpenClawPluginToolContext;
   store: WorkboardStore;
+  autoAdvance?: Pick<WorkboardAutoAdvanceService, "describeBoards">;
 }): AnyAgentTool[] {
   const { store } = params;
   const ownerId = contextOwner(params.context);
@@ -555,6 +557,7 @@ export function createWorkboardTools(params: {
     createWorkboardMoveTool({ store, readScopedCardToolParams, redactedCardResult }),
     ...createWorkboardOrchestrationTools({
       store,
+      ...(params.autoAdvance ? { autoAdvance: params.autoAdvance } : {}),
       ownerId,
       requireScopedCard,
       readScopedCardToolParams,

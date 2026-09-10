@@ -73,6 +73,10 @@ export const AGENT_FIELD_HELP: Record<string, string> = {
     "Optional lower-cost model (provider/model or alias) for short internal tasks such as generated titles and progress narration. Unset derives the primary provider's declared small model when available (otherwise the primary model); set to an empty string to disable utility routing.",
   "agents.entries.*.utilityModel":
     "Optional per-agent utility model override for short internal tasks. Overrides agents.defaults.utilityModel.",
+  "agents.entries.*.auth":
+    "Optional per-agent auth settings. Use profiles to pin a named auth profile per provider so this agent does not rotate across other subscriptions.",
+  "agents.entries.*.auth.profiles":
+    'Map of provider id to auth profile id (for example {"openai":"openai:household","anthropic":"anthropic:work"}). Session user pins and model-ref @profile suffixes still override. Missing or wrong-provider pins fail closed instead of falling through to auth.order.',
   "agents.entries.*.models": "Per-agent model catalog overrides keyed by full provider/model IDs.",
   "agents.entries.*.modelPolicy":
     "Per-agent model override policy. An explicit allow list replaces the default policy for this agent.",

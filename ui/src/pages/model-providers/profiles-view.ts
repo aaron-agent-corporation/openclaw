@@ -83,6 +83,11 @@ function profileMeta(profile: ProviderProfile): string {
   } else if (!source && profileIdentity(profile) !== profile.profileId) {
     parts.push(profile.profileId);
   }
+  if (profile.pinnedByAgentIds?.length) {
+    parts.push(
+      t("modelProviders.profiles.pinnedBy", { agents: profile.pinnedByAgentIds.join(", ") }),
+    );
+  }
   if (profile.lastUsedAt) {
     parts.push(
       t("modelProviders.profiles.lastUsed", {

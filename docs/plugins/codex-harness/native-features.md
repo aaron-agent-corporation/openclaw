@@ -49,9 +49,13 @@ the route instead, in both directions:
   and let OpenClaw inject the key it already holds.
 
 A stored OpenAI profile is fine alongside `homeScope: "user"`; OpenClaw keeps it
-for agent-scoped connections and simply does not hand it to the native home. Use
-`openclaw models auth list --provider openai` to inspect stored profiles and
-`openclaw models auth logout <profileId> --yes` to remove one you no longer want.
+for agent-scoped connections and does not inject it into the native home. Use that
+split when agent brains pin OpenClaw OAuth subscriptions via
+`agents.entries.<id>.auth.profiles` while Codex tools/ACP must bill a dedicated
+`codex login` account under `$CODEX_HOME` (and Claude Code under
+`CLAUDE_CONFIG_DIR`). Use `openclaw models auth list --provider openai` to
+inspect stored profiles and `openclaw models auth logout <profileId> --yes` to
+remove one you no longer want.
 
 Owner turns gain the `codex_threads` tool: list, search, read, fork, rename,
 archive, and restore native threads. Fork a thread to continue it in

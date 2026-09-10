@@ -79,6 +79,13 @@ export default {
     defaultBoard: "Default board",
     automationAttached: "Automation",
     automationAttachedTitle: "Open Automations",
+    autoAdvanceOn: "Auto-advance on",
+    autoAdvanceOff: "Auto-advance off",
+    autoAdvanceToggleTitle:
+      "Start eligible Ready cards automatically whenever a worker lane frees up on this board.",
+    autoAdvanceStatus: "Auto-advance: {reason}",
+    autoAdvancePending: "waiting for the first dispatch pass.",
+    autoAdvanceLastFailure: "Last start failure: {error}",
     boardFilterSummary: "{active} active · {total} total",
     boardFilterArchivedSummary: "Archived · {active} active · {total} total",
     agentFilterUnassigned: "Unassigned (uses {agent})",

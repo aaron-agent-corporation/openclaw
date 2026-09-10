@@ -20,6 +20,7 @@ import {
   cardSessionKey,
   closeRunningAttempts,
   retryBudgetExhausted,
+  WorkboardStartGateRefusedError,
 } from "./store-card-helpers.js";
 import {
   addWorkboardDurationMs,
@@ -113,6 +114,12 @@ export class WorkboardWorkflowStore extends WorkboardPromoteStore {
           ))
       ) {
         throw new Error("card workspace authority changed before claim.");
+      }
+      if (options.startGate) {
+        const board = await this.boardStore.lookup(cardBoardId(guarded));
+        if (!options.startGate(board?.version === 1 ? board.board : undefined)) {
+          throw new WorkboardStartGateRefusedError();
+        }
       }
       const existingClaim = guarded.metadata?.claim;
       const activeClaim =

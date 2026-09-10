@@ -395,9 +395,11 @@ function buildOpenAIAttributionPolicy(
     reviewNote:
       "OpenAI native traffic supports hidden originator/User-Agent attribution. Verified against the Codex wire contract.",
     ...identity,
+    // The ChatGPT backend reads `version` as the Codex client version and gates
+    // newer models on it, so the OpenAI plugin stamps its managed Codex pin on
+    // ChatGPT-transport rows; attribution must not override it with OpenClaw's.
     headers: {
       originator: OPENCLAW_ATTRIBUTION_ORIGINATOR,
-      version: identity.version,
       "User-Agent": formatOpenClawUserAgent(identity.version),
     },
   };

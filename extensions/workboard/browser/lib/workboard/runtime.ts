@@ -308,6 +308,7 @@ function createDefaultState(): WorkboardUiState {
     missingTaskIds: new Set(),
     lastDispatchSummary: null,
     dispatching: false,
+    boardSettingsSaving: false,
     query: "",
     priorityFilter: "all",
     agentFilter: "all",
@@ -372,7 +373,12 @@ export function workboardMutationsReady(state: WorkboardUiState): boolean {
 }
 
 export function workboardHasActiveWrites(state: WorkboardUiState): boolean {
-  return Boolean(state.draftSaving || state.busyCardIds.size || state.capturingSessionKeys.size);
+  return Boolean(
+    state.draftSaving ||
+    state.boardSettingsSaving ||
+    state.busyCardIds.size ||
+    state.capturingSessionKeys.size,
+  );
 }
 
 function workboardHasActiveLoad(host: WorkboardHost): boolean {

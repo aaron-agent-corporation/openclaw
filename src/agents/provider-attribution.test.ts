@@ -459,7 +459,6 @@ describe("provider attribution", () => {
       version: "2026.3.22",
       headers: {
         originator: "openclaw",
-        version: "2026.3.22",
         "User-Agent": "openclaw/2026.3.22",
       },
     });
@@ -467,7 +466,6 @@ describe("provider attribution", () => {
       resolveProviderAttributionPolicy("openai", { OPENCLAW_VERSION: "2026.3.22" })?.headers,
     ).toEqual({
       originator: "openclaw",
-      version: "2026.3.22",
       "User-Agent": "openclaw/2026.3.22",
     });
   });
@@ -484,7 +482,6 @@ describe("provider attribution", () => {
       version: "2026.3.22",
       headers: {
         originator: "openclaw",
-        version: "2026.3.22",
         "User-Agent": "openclaw/2026.3.22",
       },
     });

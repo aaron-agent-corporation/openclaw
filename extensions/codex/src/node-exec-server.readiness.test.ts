@@ -8,7 +8,7 @@ import { setManagedCodexPluginRoot } from "./app-server/managed-binary.js";
 import * as transport from "./app-server/transport-stdio.js";
 import { runCodexNodeExecServer } from "./node-exec-server.runtime.js";
 
-// Pinned Codex 0.153.4 transport.rs emits this line before entering its stdio loop.
+// Pinned Codex 0.154.0-alpha.11 transport.rs emits this line before entering its stdio loop.
 const READY = " INFO codex_exec_server::server::transport: codex-exec-server listening on stdio\n";
 const fixture = `
 const readline = require('node:readline');

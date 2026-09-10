@@ -722,6 +722,7 @@ function sessionDetailItems(params: {
   add(t("sessionsView.goalNote"), row.goal?.lastStatusNote);
   add(t("sessionsView.model"), row.model);
   add(t("sessionsView.provider"), row.modelProvider);
+  add(t("sessionsView.authProfile"), row.authProfileLabel ?? row.authProfileId ?? undefined);
   // The roster dropped its Runtime column; the drawer is where agent runtime
   // and run duration live now.
   add(t("sessionsView.runtime"), formatAgentRuntimeLabel(row.agentRuntime));

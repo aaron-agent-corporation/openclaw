@@ -135,7 +135,7 @@ specific mapping.
       [Anthropic provider fast mode](/providers/anthropic#advanced-configuration)).
     - No Responses `store`, prompt-cache hints, or OpenAI reasoning-compat
       payload shaping.
-    - OpenClaw's OpenAI/Codex attribution headers (`originator`, `version`,
+    - OpenClaw's OpenAI/Codex attribution headers (`originator`,
       `User-Agent`) are only sent on native `api.openai.com` OAuth traffic, not
       on custom `OPENAI_BASE_URL` targets like this proxy.
 

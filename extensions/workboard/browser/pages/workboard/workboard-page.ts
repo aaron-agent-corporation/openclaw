@@ -16,14 +16,17 @@ import {
   refreshWorkboard,
   resetDraftState,
   resumeWorkboardLiveRefresh,
+  setWorkboardBoardAutoAdvance,
   stopWorkboardLifecycleRefresh,
   stopWorkboardLiveRefresh,
   syncWorkboardLifecycle,
+  workboardMutationsReady,
   type WorkboardCard,
   type WorkboardUiState,
   WORKBOARD_CHANGED_EVENT,
 } from "../../lib/workboard/index.ts";
 import { createWorkboardSessionResolver } from "../../lib/workboard/session-resolution.ts";
+import type { WorkboardBoardSummary } from "../../lib/workboard/types.ts";
 import { matchesAgentScope } from "./agent-filter.ts";
 import { matchesBoardFilter, WORKBOARD_ALL_BOARDS_FILTER } from "./board-filter.ts";
 import { getVisibleDetailCard } from "./view-card-details.ts";
@@ -34,6 +37,27 @@ export function workboardPageTarget(boardId?: string) {
     id: "workboard",
     path: boardId && boardId !== WORKBOARD_ALL_BOARDS_FILTER ? [boardId] : [],
   };
+}
+
+function renderAutoAdvanceStatus(board: WorkboardBoardSummary) {
+  if (board.orchestration?.autoAdvance !== true) {
+    return nothing;
+  }
+  const status = board.autoAdvance;
+  const reason = status?.idleReason ?? t("workboard.autoAdvancePending");
+  const failure = status?.lastFailure;
+  return html`<div class="workboard-auto-advance-status" role="status">
+    <span>${t("workboard.autoAdvanceStatus", { reason })}</span>
+    ${
+      failure
+        ? html`<span class="workboard-auto-advance-status__failure"
+            >${t("workboard.autoAdvanceLastFailure", {
+              error: failure.title ? `${failure.title}: ${failure.error}` : failure.error,
+            })}</span
+          >`
+        : nothing
+    }
+  </div>`;
 }
 
 function reconcileCardOverlays(state: WorkboardUiState, visible: (card: WorkboardCard) => boolean) {
@@ -76,6 +100,32 @@ export function createWorkboardPage(workboard: WorkboardCapability): ControlUiVi
           update();
         }
       });
+    };
+    const renderAutoAdvanceToggle = (board: WorkboardBoardSummary) => {
+      const enabled = board.orchestration?.autoAdvance === true;
+      const canWrite = host.connection.canWrite;
+      if (!canWrite && !enabled) {
+        return nothing;
+      }
+      return html`<button
+        class="chip workboard-auto-advance-toggle"
+        type="button"
+        aria-pressed=${enabled ? "true" : "false"}
+        title=${t("workboard.autoAdvanceToggleTitle")}
+        ?disabled=${!connected || !canWrite || !workboardMutationsReady(state) || state.boardSettingsSaving}
+        @click=${() =>
+          void setWorkboardBoardAutoAdvance({
+            host: workboard,
+            client: connected ? client : null,
+            boardId: board.id,
+            enabled: !enabled,
+            requestUpdate,
+          })}
+      >
+        ${icons.zap}<span
+          >${enabled ? t("workboard.autoAdvanceOn") : t("workboard.autoAdvanceOff")}</span
+        >
+      </button>`;
     };
     const sessionResolver = createWorkboardSessionResolver(host, requestUpdate);
     const stop = () => {
@@ -230,8 +280,10 @@ export function createWorkboardPage(workboard: WorkboardCapability): ControlUiVi
                       >`
                     : nothing
                 }
+                ${selectedBoard ? renderAutoAdvanceToggle(selectedBoard) : nothing}
               </div>
               ${selectedBoard ? html`<div class="page-subtitle">Workboard</div>` : nothing}
+              ${selectedBoard ? renderAutoAdvanceStatus(selectedBoard) : nothing}
             </div>
             ${renderAgentPicker(
               {

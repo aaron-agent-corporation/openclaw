@@ -678,6 +678,7 @@ describe("WorkboardStore", () => {
         id: "planning",
         name: "Planning",
         automationJobId: "job-categorize-planning",
+        orchestration: { autoAdvance: true },
       });
       const card = await store.create({
         title: "Persist it",
@@ -774,6 +775,7 @@ describe("WorkboardStore", () => {
             id: board.id,
             name: "Planning",
             automationJobId: "job-categorize-planning",
+            orchestration: { autoAdvance: true },
           }),
         ],
       });
@@ -1282,7 +1284,7 @@ describe("WorkboardStore", () => {
         reason: "delayed first failure",
         failedAt: 201,
       }),
-    ).resolves.toBe(false);
+    ).resolves.toBeUndefined();
     await expect(
       store.syncLifecycle(card.id, {
         targetStatus: "review",

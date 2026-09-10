@@ -390,6 +390,14 @@ describe("OpenAI Codex OAuth flow", () => {
     expect(flow.state).toMatch(/^[a-f0-9]{32}$/u);
     expect(url.searchParams.get("state")).toBe(flow.state);
     expect(url.searchParams.get("originator")).toBe("openclaw-test");
+    expect(url.searchParams.get("scope")?.split(" ")).toEqual([
+      "openid",
+      "profile",
+      "email",
+      "offline_access",
+      "api.connectors.read",
+      "api.connectors.invoke",
+    ]);
     const redirectUri = url.searchParams.get("redirect_uri");
     expect(redirectUri).toBeTruthy();
     expect(flow.redirectUri).toBe(redirectUri);

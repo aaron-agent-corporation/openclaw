@@ -154,7 +154,7 @@ describe("Realtime call creation", () => {
       originator: "openclaw",
       "session-id": "oauth-session",
       "thread-id": "oauth-thread",
-      version: "2026.7.2-test",
+
       "x-session-id": "oauth-realtime",
       "Content-Type": "application/json",
     });
@@ -247,11 +247,12 @@ describe("Realtime call creation", () => {
         originator: "openclaw",
         "session-id": "ga-oauth-session",
         "thread-id": "ga-oauth-thread",
-        version: "2026.7.2-test",
+
         "x-session-id": "ga-oauth-realtime",
         "Content-Type": expect.stringMatching(/^multipart\/form-data; boundary=/),
       });
       expect(headers).not.toHaveProperty("OpenAI-Alpha");
+      expect(headers).not.toHaveProperty("version");
       const boundary = headers?.["Content-Type"]?.split("boundary=")[1];
       expect(boundary).toBeTruthy();
       expect(typeof capturedInit?.body).toBe("string");

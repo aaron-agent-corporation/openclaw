@@ -185,8 +185,12 @@ export class WorkboardCoreStore extends WorkboardStoreRuntime {
     return errors;
   }
 
-  async compensateWorkspaceMutation(before: WorkboardCard, after: WorkboardCard): Promise<void> {
-    await this.enqueueMutation(
+  /** Returns the compensated card when a write happened; undefined when nothing needed reverting. */
+  async compensateWorkspaceMutation(
+    before: WorkboardCard,
+    after: WorkboardCard,
+  ): Promise<WorkboardCard | undefined> {
+    return await this.enqueueMutation(
       async () => await this.rollbackUpdatedCard(before, after, invertWorkboardWorkspaceMutation),
     );
   }
@@ -195,22 +199,22 @@ export class WorkboardCoreStore extends WorkboardStoreRuntime {
     before: WorkboardCard,
     after: WorkboardCard,
     invert = invertWorkboardCardMutation,
-  ): Promise<void> {
+  ): Promise<WorkboardCard | undefined> {
     for (let attempt = 0; attempt < WORKBOARD_CAS_ATTEMPTS; attempt += 1) {
       const current = await this.get(after.id);
       if (!current) {
-        return;
+        return undefined;
       }
       const merged = invert(before, after, current);
       if (sameWorkboardCardState(current, merged)) {
-        return;
+        return undefined;
       }
       const compensation = {
         ...merged,
         updatedAt: Math.max(Date.now(), current.updatedAt + 1),
       };
       if (await this.registerCardIfUpdatedAt(compensation, current.updatedAt)) {
-        return;
+        return compensation;
       }
     }
     throw new Error(`card changed repeatedly during compensation: ${after.id}`);

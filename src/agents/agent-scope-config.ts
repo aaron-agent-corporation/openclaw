@@ -57,6 +57,7 @@ export type ResolvedAgentConfig = {
   name?: string;
   workspace?: string;
   agentDir?: string;
+  auth?: AgentEntry["auth"];
   model?: AgentEntry["model"];
   models?: AgentEntry["models"];
   params?: AgentEntry["params"];
@@ -422,6 +423,7 @@ export function resolveAgentConfig(
     name: readStringValue(entry.name),
     workspace: readStringValue(entry.workspace),
     agentDir: readStringValue(entry.agentDir),
+    ...(entry.auth ? { auth: entry.auth } : {}),
     model:
       typeof entry.model === "string" || (entry.model && typeof entry.model === "object")
         ? entry.model

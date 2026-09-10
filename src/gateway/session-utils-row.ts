@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { asNonNegativeFiniteNumber } from "@openclaw/normalization-core/number-coercion";
 import { normalizeOptionalString } from "@openclaw/normalization-core/string-coerce";
 import { SESSION_PARTICIPANT_LIMIT } from "../../packages/gateway-protocol/src/schema/session-participant.js";
+import { resolveConfiguredAuthProfileId } from "../agents/auth-profiles/agent-configured-profile.js";
 import { resolveAuthoredModelContextTokens } from "../agents/context-resolution.js";
 import { resolveContextTokensForModel } from "../agents/context.js";
 import { DEFAULT_MODEL, DEFAULT_PROVIDER } from "../agents/defaults.js";
@@ -19,6 +20,7 @@ import {
   type InternalSessionEntry,
   type SessionEntry,
 } from "../config/sessions.js";
+import { resolveSessionAuthProfileOverrideSource } from "../config/sessions/auth-profile-override-provenance.js";
 import { resolveSessionModelOverrideSource } from "../config/sessions/model-override-provenance.js";
 import { sessionEntryForkedFromParent } from "../config/sessions/session-entry-lineage.js";
 import {
@@ -496,6 +498,27 @@ export function buildGatewaySessionRow(params: {
     model: rowModelIdentity.model,
     activeModelProvider: activeFallback.active ? runtimeModels.active.provider : undefined,
     activeModel: activeFallback.active ? runtimeModels.active.model : undefined,
+    ...(() => {
+      const sessionPin = normalizeOptionalString(entry?.authProfileOverride);
+      const source = resolveSessionAuthProfileOverrideSource(entry);
+      const configuredPin = rowModelProvider
+        ? resolveConfiguredAuthProfileId({
+            cfg,
+            agentId: sessionAgentId,
+            provider: rowModelProvider,
+            modelId: rowModel ? `${rowModelProvider}/${rowModel}` : undefined,
+          })
+        : undefined;
+      const pinned =
+        source === "user" || source === "user-link"
+          ? (sessionPin ?? configuredPin)
+          : (configuredPin ?? sessionPin);
+      if (!pinned) {
+        return {};
+      }
+      // Session readers do not have the admin-only account identity view.
+      return { authProfileId: pinned, authProfileLabel: pinned };
+    })(),
     modelOverrideSource: resolveSessionModelOverrideSource(entry),
     modelSelectionLocked: entry?.modelSelectionLocked,
     agentRuntime: projectWorkerPlacementAgentRuntime(thinkingProjection.agentRuntime),

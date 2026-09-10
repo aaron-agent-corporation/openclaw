@@ -141,6 +141,7 @@ const enSettings = {
       none: "Not configured",
     },
     profiles: {
+      pinnedBy: "Pinned by {agents}",
       title: "Provider profiles",
       accountOne: "1 account",
       accounts: "{count} accounts",

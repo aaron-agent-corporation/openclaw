@@ -439,6 +439,8 @@ export function createWorkboardLifecycleService(params: {
     options: WorkboardLifecycleSessionReadOptions,
   ) => Promise<WorkboardLifecycleSessionSnapshot>;
   now?: () => number;
+  /** Runs after a sweep fully settles session state; skipped when a sweep fails. */
+  onReconciled?: () => void;
 }): WorkboardLifecycleService {
   let generation = 0;
   let timer: ReturnType<typeof setTimeout> | undefined;
@@ -482,6 +484,7 @@ export function createWorkboardLifecycleService(params: {
       const owner = ++generation;
       let begun = false;
       const reconcile = async () => {
+        let reconciled = true;
         try {
           await params.store.runOperation(async () => {
             let cards = await params.store.list();
@@ -498,6 +501,10 @@ export function createWorkboardLifecycleService(params: {
                 if (generation !== owner) {
                   return;
                 }
+                // A partial snapshot cannot prove that omitted workers have ended.
+                if (!snapshot.complete) {
+                  reconciled = false;
+                }
                 await syncWorkboardLifecycleSessions({
                   store: params.store,
                   cards,
@@ -509,6 +516,7 @@ export function createWorkboardLifecycleService(params: {
                 }
                 cards = await params.store.list();
               } catch (error) {
+                reconciled = false;
                 ctx.logger.warn(`workboard lifecycle sync failed: ${String(error)}`);
               }
             }
@@ -517,9 +525,15 @@ export function createWorkboardLifecycleService(params: {
             }
           });
         } catch (error) {
+          reconciled = false;
           ctx.logger.warn(`workboard lifecycle recovery failed: ${String(error)}`);
         } finally {
           if (generation === owner) {
+            // A failed sweep leaves worker state unproven; dependents such as
+            // auto-advance must wait for a later successful sweep.
+            if (reconciled) {
+              params.onReconciled?.();
+            }
             timer = setTimeout(() => void reconcile(), WORKBOARD_LIFECYCLE_SWEEP_MS);
             timer.unref?.();
           }

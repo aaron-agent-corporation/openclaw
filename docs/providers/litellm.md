@@ -179,7 +179,7 @@ without a global private-network override. For a LAN-hosted proxy, set
     - Native-OpenAI-only request shaping does not apply through a configured LiteLLM base URL:
       no `service_tier`, no Responses `store`, no prompt-cache hints, no OpenAI reasoning-effort
       payload shaping.
-    - Hidden OpenClaw attribution headers (`originator`, `version`, `User-Agent`) are only sent to
+    - Hidden OpenClaw attribution headers (`originator`, `User-Agent`) are only sent to
       verified native OpenAI endpoints, so they are not injected on a custom LiteLLM base URL.
   </Accordion>
 </AccordionGroup>

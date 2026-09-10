@@ -85,10 +85,11 @@ describe("OpenAI realtime voice bridge connection", () => {
       | undefined;
     expectRecordFields(options?.headers, "websocket headers", {
       originator: "openclaw",
-      version: "2026.3.22",
+
       "User-Agent": "openclaw/2026.3.22",
     });
     expect(options?.headers).not.toHaveProperty("OpenAI-Beta");
+    expect(options?.headers).not.toHaveProperty("version");
     expect(options?.maxPayload).toBe(16 * 1024 * 1024);
   });
 

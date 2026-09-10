@@ -1065,11 +1065,13 @@ describe("openai transport stream", () => {
 
     expectRecordFields(headers, {
       originator: "openclaw",
-      version: "2026.3.22",
       "User-Agent": "openclaw/2026.3.22",
       "X-Provider": "model",
       "X-Caller": "request",
     });
+    // `version` is the Codex client version on OpenAI native traffic; core
+    // attribution must not fabricate it from OpenClaw's own version.
+    expect(headers.version).toBeUndefined();
   });
 
   it("adds OpenClaw attribution to native OpenAI Codex transport headers", () => {
@@ -1090,9 +1092,9 @@ describe("openai transport stream", () => {
 
     expectRecordFields(headers, {
       originator: "openclaw",
-      version: "2026.3.22",
       "User-Agent": "openclaw/2026.3.22",
     });
+    expect(headers.version).toBeUndefined();
     expect(headers.Accept).toBeUndefined();
     expect(headers.accept).toBeUndefined();
   });

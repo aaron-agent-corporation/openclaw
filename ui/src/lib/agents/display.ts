@@ -44,6 +44,7 @@ type AgentConfigEntry = {
   name?: string;
   workspace?: string;
   agentDir?: string;
+  auth?: { profiles?: Record<string, string> };
   model?: unknown;
   models?: Record<string, { alias?: unknown }>;
   agentRuntime?: unknown;

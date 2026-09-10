@@ -355,6 +355,14 @@ export function assertCanMutateClaimedCard(
   }
 }
 
+// Distinct from start failures: a refused gate is a deliberate stop, not an error to record.
+export class WorkboardStartGateRefusedError extends Error {
+  constructor() {
+    super("automatic start refused: board opt-in or dispatcher no longer active.");
+    this.name = "WorkboardStartGateRefusedError";
+  }
+}
+
 export function retryBudgetExhausted(card: WorkboardCard): boolean {
   const maxRetries = card.metadata?.automation?.maxRetries;
   return Boolean(maxRetries && (card.metadata?.failureCount ?? 0) > maxRetries);

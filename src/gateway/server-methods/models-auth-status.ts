@@ -19,6 +19,7 @@ import {
   type AuthProfileStore,
   ensureAuthProfileStoreWithoutExternalProfiles,
   externalCliDiscoveryForConfigStatus,
+  indexAgentAuthProfilePins,
   listProfilesForProvider,
   removeAuthProfilesAcrossOwnerStores,
   removeProviderAuthProfilesWithLock,
@@ -298,6 +299,7 @@ function mapProvider(
   externalProfileIds: ReadonlySet<string>,
   externalCliProfileIds: ReadonlySet<string>,
   includeProfileIdentity: boolean,
+  agentPinsByProfile: ReadonlyMap<string, string[]>,
 ): ModelAuthStatusProvider {
   const providerKey = normalizeProviderId(prov.provider);
   const authProviderKey = resolveProviderIdForAuth(prov.provider, authAliasLookupParams);
@@ -362,6 +364,7 @@ function mapProvider(
     profiles: prov.profiles.map((prof) => {
       const metadata = resolveAuthProfileMetadata({ cfg, store, profileId: prof.profileId });
       const lastUsedAt = store.usageStats?.[prof.profileId]?.lastUsed;
+      const pinnedByAgentIds = agentPinsByProfile.get(prof.profileId);
       return {
         profileId: prof.profileId,
         type: prof.type,
@@ -381,6 +384,7 @@ function mapProvider(
           : {}),
         ...(includeProfileIdentity && metadata.email ? { email: metadata.email } : {}),
         ...(includeProfileIdentity && lastUsedAt ? { lastUsedAt } : {}),
+        ...(includeProfileIdentity && pinnedByAgentIds?.length ? { pinnedByAgentIds } : {}),
         ...((prof.type === "oauth" || prof.type === "token") &&
         logoutProfileIds.has(prof.profileId) &&
         !configBoundProfileIds.has(prof.profileId)
@@ -705,6 +709,7 @@ export const modelsAuthStatusHandlers: GatewayRequestHandlers = {
           .filter(([profileId]) => configBoundProfileIds.has(profileId))
           .map(([, profile]) => resolveProviderIdForAuth(profile.provider, authAliasLookupParams)),
       );
+      const agentPinsByProfile = indexAgentAuthProfilePins(cfg);
       const providers = authHealth.providers.map((prov) =>
         mapProvider(
           prov,
@@ -720,6 +725,7 @@ export const modelsAuthStatusHandlers: GatewayRequestHandlers = {
           externalProfileIds,
           externalCliProfileIds,
           includeProfileIdentity,
+          agentPinsByProfile,
         ),
       );
       const providerCapabilities = buildProviderCapabilities({

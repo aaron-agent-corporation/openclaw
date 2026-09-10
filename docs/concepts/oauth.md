@@ -170,7 +170,7 @@ Flow shape (PKCE):
 
 1. generate a PKCE verifier/challenge and a random `state`
 2. open `https://auth.openai.com/oauth/authorize?...` (scope
-   `openid profile email offline_access`)
+   `openid profile email offline_access api.connectors.read api.connectors.invoke`, matching the Codex CLI login)
 3. try to capture the callback on `http://localhost:1455/auth/callback` (the
    callback host defaults to `localhost` and only accepts loopback hosts;
    override with `OPENCLAW_OAUTH_CALLBACK_HOST`)
@@ -221,8 +221,36 @@ Then configure auth per-agent (wizard) and route chats to the right agent.
 The auth profile store supports multiple profile IDs for the same provider.
 Pick which one is used:
 
+- per agent via `agents.entries.<id>.auth.profiles` (provider → profile id)
 - globally via config ordering (`auth.order`)
 - per-session via `/model ...@<profileId> -s`
+
+<a id="agent-subscription-pins" />
+
+In **Settings → Agents → Overview → Model Selection**, use **Subscription pins**
+to select an account for each provider. **Add subscription…** opens provider
+sign-in; choose the account if prompted, then save the agent configuration.
+**Settings → Model Providers** shows which agents pin each account. Session user
+and personal-account pins take precedence over the agent pin.
+
+Example (agent pin):
+
+```json5
+{
+  agents: {
+    entries: {
+      researcher: {
+        auth: {
+          profiles: {
+            openai: "openai:household",
+            anthropic: "anthropic:work",
+          },
+        },
+      },
+    },
+  },
+}
+```
 
 Example (session override):
 
@@ -263,6 +291,7 @@ Related docs:
 
 - [Model failover](/concepts/model-failover) (rotation + cooldown rules)
 - [Slash commands](/tools/slash-commands) (command surface)
+- [Auth credential semantics](/auth-credential-semantics) (pin precedence)
 
 ## Related
 
