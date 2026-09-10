@@ -167,9 +167,35 @@ jobs:
           pnpm test
           ui/src/pages/agents/auth-pins.test.ts
           ui/src/pages/agents/agents-page.test.ts
+          ui/src/pages/agents/panels-overview.test.ts
+          ui/src/components/modal-dialog.test.ts
           extensions/workboard/browser/lib/workboard/index.test.ts
           extensions/workboard/browser/pages/workboard/workboard-page.test.ts
           --reporter=verbose --passWithNoTests=false
+      - name: Install workspace-pinned Chromium and system dependencies
+        working-directory: source
+        run: pnpm exec playwright install --with-deps chromium
+      - name: Verify account outcomes and Workboard in Chromium
+        id: ui_e2e
+        working-directory: source
+        env:
+          OPENCLAW_VITEST_MAX_WORKERS: 1
+          OPENCLAW_CAPTURE_UI_PROOF: "1"
+        run: >-
+          node scripts/run-vitest.mjs run
+          --config test/vitest/vitest.ui-e2e.config.ts --configLoader runner
+          ui/src/e2e/model-providers-profile-outcomes.e2e.test.ts
+          ui/src/pages/workboard/workboard.e2e.test.ts
+          --reporter=verbose --passWithNoTests=false
+      - name: Retain Control UI browser proof
+        if: always() && steps.ui_e2e.outcome != 'skipped'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: render-ui-proof-${{ github.run_id }}-${{ github.run_attempt }}
+          path: source/.artifacts/control-ui-e2e
+          include-hidden-files: true
+          retention-days: 7
+          if-no-files-found: warn
       - name: Free disposable runner space for the full image
         run: |
           rm -rf source/node_modules
