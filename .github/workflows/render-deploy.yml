@@ -80,18 +80,38 @@ jobs:
           if (!/^\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?$/.test(version)) throw new Error('Invalid package version');
           appendFileSync(process.env.GITHUB_OUTPUT, `version=${version}\n`);
           JS
-      - name: Check production types
+      # Continue independent checks for complete feedback. The required outcome
+      # barrier below owns success; continue-on-error conclusions are not proof.
+      - name: Check core production types
+        id: types_core
+        continue-on-error: true
         working-directory: source
-        run: pnpm tsgo:prod
+        run: pnpm tsgo:core
+      - name: Check Control UI production types
+        id: types_ui
+        continue-on-error: true
+        working-directory: source
+        run: pnpm tsgo:ui
+      - name: Check plugin production types
+        id: types_plugins
+        continue-on-error: true
+        working-directory: source
+        run: pnpm tsgo:extensions
       - name: Check plugin test types
+        id: types_plugin_tests
+        continue-on-error: true
         working-directory: source
         run: pnpm tsgo:extensions:test
       - name: Verify Control UI translations
+        id: translations
+        continue-on-error: true
         working-directory: source
         run: pnpm ui:i18n:verify
       # These owner paths follow the retained auth, provider, and Workboard
       # features across releases. Keep core and plugin type contexts separate.
       - name: Lint retained core and Control UI features
+        id: lint_core_ui
+        continue-on-error: true
         working-directory: source
         run: >-
           node scripts/run-oxlint.mjs --tsconfig config/tsconfig/oxlint.core.json
@@ -112,31 +132,43 @@ jobs:
           ui/src/pages/model-providers ui/src/pages/sessions
           ui/src/i18n/locales/en.ts
       - name: Lint retained plugins and Workboard browser features
+        id: lint_plugins
+        continue-on-error: true
         working-directory: source
         run: >-
           node scripts/run-oxlint.mjs --tsconfig extensions/tsconfig.json
           extensions/codex extensions/openai extensions/workboard
       - name: Lint Codex release and media smoke scripts
+        id: lint_scripts
+        continue-on-error: true
         working-directory: source
         run: >-
           node scripts/run-oxlint.mjs --tsconfig config/tsconfig/oxlint.scripts.json
           scripts/e2e/lib/codex-media-path
           scripts/e2e/lib/codex-release-package-assertions.mjs
       - name: Test deployment helper
+        id: test_deployment
+        continue-on-error: true
         run: node --test pipeline/deploy/render/deploy.test.mjs
       # Keep plugin invocations separate: mixed core/plugin filters can select
       # only core projects in the upstream test router.
       - name: Test Workboard
+        id: test_workboard
+        continue-on-error: true
         working-directory: source
         env:
           OPENCLAW_VITEST_MAX_WORKERS: 2
         run: pnpm test extensions/workboard --reporter=verbose --passWithNoTests=false
       - name: Test OpenAI
+        id: test_openai
+        continue-on-error: true
         working-directory: source
         env:
           OPENCLAW_VITEST_MAX_WORKERS: 2
         run: pnpm test extensions/openai --reporter=verbose --passWithNoTests=false
       - name: Test Codex
+        id: test_codex
+        continue-on-error: true
         working-directory: source
         env:
           OPENCLAW_VITEST_MAX_WORKERS: 2
@@ -147,6 +179,8 @@ jobs:
           extensions/codex/src/node-exec-server.readiness.test.ts
           --reporter=verbose --passWithNoTests=false
       - name: Test custom auth and provider attribution
+        id: test_auth
+        continue-on-error: true
         working-directory: source
         env:
           OPENCLAW_VITEST_MAX_WORKERS: 2
@@ -160,6 +194,8 @@ jobs:
           test/scripts/codex-client-version-contract.test.ts
           --reporter=verbose --passWithNoTests=false
       - name: Test agent account pins and Workboard controls
+        id: test_ui
+        continue-on-error: true
         working-directory: source
         env:
           OPENCLAW_VITEST_MAX_WORKERS: 2
@@ -173,10 +209,14 @@ jobs:
           extensions/workboard/browser/pages/workboard/workboard-page.test.ts
           --reporter=verbose --passWithNoTests=false
       - name: Install workspace-pinned Chromium and system dependencies
+        id: chromium
+        continue-on-error: true
         working-directory: source
         run: pnpm exec playwright install --with-deps chromium
       - name: Verify account outcomes and Workboard in Chromium
         id: ui_e2e
+        if: steps.chromium.outcome == 'success'
+        continue-on-error: true
         working-directory: source
         env:
           OPENCLAW_VITEST_MAX_WORKERS: 1
@@ -196,12 +236,51 @@ jobs:
           include-hidden-files: true
           retention-days: 7
           if-no-files-found: warn
+      - name: Require every validation to succeed
+        id: validation_barrier
+        if: always()
+        env:
+          VALIDATION_OUTCOMES: >-
+            types_core=${{ steps.types_core.outcome }}
+            types_ui=${{ steps.types_ui.outcome }}
+            types_plugins=${{ steps.types_plugins.outcome }}
+            types_plugin_tests=${{ steps.types_plugin_tests.outcome }}
+            translations=${{ steps.translations.outcome }}
+            lint_core_ui=${{ steps.lint_core_ui.outcome }}
+            lint_plugins=${{ steps.lint_plugins.outcome }}
+            lint_scripts=${{ steps.lint_scripts.outcome }}
+            test_deployment=${{ steps.test_deployment.outcome }}
+            test_workboard=${{ steps.test_workboard.outcome }}
+            test_openai=${{ steps.test_openai.outcome }}
+            test_codex=${{ steps.test_codex.outcome }}
+            test_auth=${{ steps.test_auth.outcome }}
+            test_ui=${{ steps.test_ui.outcome }}
+            chromium=${{ steps.chromium.outcome }}
+            ui_e2e=${{ steps.ui_e2e.outcome }}
+        run: |
+          test -n "$VALIDATION_OUTCOMES"
+          failed=0
+          printf '| Validation | Outcome |\n| --- | --- |\n' >> "$GITHUB_STEP_SUMMARY"
+          for entry in $VALIDATION_OUTCOMES; do
+            name="${entry%%=*}"
+            outcome="${entry#*=}"
+            printf '%s: %s\n' "$name" "${outcome:-missing}"
+            printf '| %s | %s |\n' "$name" "${outcome:-missing}" >> "$GITHUB_STEP_SUMMARY"
+            if [[ "$outcome" != success ]]; then
+              failed=1
+            fi
+          done
+          if (( failed )); then
+            echo '::error::Every required validation must succeed before building the image.'
+            exit 1
+          fi
       - name: Free disposable runner space for the full image
         run: |
           rm -rf source/node_modules
           sudo rm -rf /usr/local/lib/android /usr/share/dotnet /opt/ghc /opt/hostedtoolcache/CodeQL
       - uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4.3.0
       - name: Build full upstream image
+        if: success() && steps.validation_barrier.outcome == 'success'
         uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7
         with:
           context: source
