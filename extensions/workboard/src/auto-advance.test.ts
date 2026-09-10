@@ -1,13 +1,14 @@
 // Workboard tests cover deterministic board auto-advance.
-import type { WorkboardBoardMetadata, WorkboardCard } from "@openclaw/workboard-contract";
+import type { WorkboardCard } from "@openclaw/workboard-contract";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   createWorkboardAutoAdvanceService,
   describeWorkboardIdleReason,
   WORKBOARD_AUTO_ADVANCE_RETRY_BASE_MS,
+  type WorkboardAutoAdvanceDispatch,
   type WorkboardAutoAdvanceService,
 } from "./auto-advance.js";
-import { dispatchAndStartWorkboardCards } from "./dispatcher.js";
+import { dispatchAndStartWorkboardCards, type WorkboardSubagentRuntime } from "./dispatcher.js";
 import { createWorkboardLifecycleService, syncWorkboardSubagentEnded } from "./lifecycle-sync.js";
 import type { PersistedWorkboardCard, WorkboardKeyedStore } from "./persistence-types.js";
 import { workboardSessionKeyForCard } from "./session-link.js";
@@ -31,32 +32,17 @@ function createMemoryStore(): WorkboardKeyedStore {
   };
 }
 
-type Harness = {
-  store: WorkboardStore;
-  service: WorkboardAutoAdvanceService;
-  run: ReturnType<typeof vi.fn>;
-  dispatch: ReturnType<typeof vi.fn>;
-  logger: { info: ReturnType<typeof vi.fn>; warn: ReturnType<typeof vi.fn> };
-  clock: { now: number };
-};
-
 const services: WorkboardAutoAdvanceService[] = [];
 
-async function createHarness(options: { now?: number } = {}): Promise<Harness> {
+async function createHarness(options: { now?: number } = {}) {
   const store = new WorkboardStore(createMemoryStore());
   const clock = { now: options.now ?? Date.now() };
   let runCounter = 0;
-  const run = vi.fn(async () => ({ runId: `run-${++runCounter}` }));
-  const dispatch = vi.fn(
-    async ({
-      boardId,
-      now,
-      startGate,
-    }: {
-      boardId: string;
-      now: number;
-      startGate: (board: WorkboardBoardMetadata | undefined) => boolean;
-    }) =>
+  const run = vi.fn<WorkboardSubagentRuntime["run"]>(async () => ({
+    runId: `run-${++runCounter}`,
+  }));
+  const dispatch = vi.fn<WorkboardAutoAdvanceDispatch>(
+    async ({ boardId, now, startGate }) =>
       await dispatchAndStartWorkboardCards({
         store,
         subagent: { run },

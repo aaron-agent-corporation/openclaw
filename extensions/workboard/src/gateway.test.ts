@@ -203,7 +203,7 @@ describe("workboard gateway methods", () => {
         },
       ),
     } as unknown as OpenClawPluginApi;
-    const describeBoards = vi.fn((boards: WorkboardBoardSummary[]) =>
+    const describeBoards = vi.fn((boards: readonly WorkboardBoardSummary[]) =>
       boards.map((board) =>
         board.id === "ops"
           ? { ...board, autoAdvance: { enabled: true, idleReason: "No Ready cards are waiting." } }
