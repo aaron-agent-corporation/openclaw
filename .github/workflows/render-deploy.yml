@@ -1,0 +1,240 @@
+name: Render image
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      source_ref:
+        description: Source branch, tag, or commit (empty uses main at dispatch)
+        type: string
+        required: false
+      deploy:
+        description: Deploy after validation (source must still be current main)
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: render-production
+  cancel-in-progress: false
+
+jobs:
+  build:
+    if: github.repository == 'aaron-agent-corporation/openclaw' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    outputs:
+      source_sha: ${{ steps.source.outputs.sha }}
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - name: Check out trusted pipeline
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.workflow_sha }}
+          path: pipeline
+          persist-credentials: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: 24.19.0
+          package-manager-cache: false
+      - name: Resolve immutable source
+        id: source
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SOURCE_REF: ${{ inputs.source_ref || github.sha }}
+        run: |
+          node --input-type=module <<'JS'
+          import { appendFileSync } from 'node:fs';
+          const response = await fetch(`https://api.github.com/repos/${process.env.GITHUB_REPOSITORY}/commits/${encodeURIComponent(process.env.SOURCE_REF)}`, {
+            headers: { Authorization: `Bearer ${process.env.GH_TOKEN}`, Accept: 'application/vnd.github+json' },
+            signal: AbortSignal.timeout(30000),
+          });
+          if (!response.ok) throw new Error(`Resolve source: HTTP ${response.status}`);
+          const { sha } = await response.json();
+          if (!/^[a-f0-9]{40}$/.test(sha)) throw new Error('Invalid source SHA');
+          appendFileSync(process.env.GITHUB_OUTPUT, `sha=${sha}\n`);
+          console.log(`Source: ${sha}`);
+          JS
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ steps.source.outputs.sha }}
+          path: source
+          persist-credentials: false
+      - name: Install pinned package manager and dependencies
+        working-directory: source
+        run: |
+          npm install --global corepack@0.34.6
+          corepack enable
+          corepack prepare "$(node -p 'require("./package.json").packageManager')" --activate
+          pnpm install --frozen-lockfile
+      - name: Read image version
+        id: version
+        working-directory: source
+        run: |
+          node --input-type=module <<'JS'
+          import { readFileSync, appendFileSync } from 'node:fs';
+          const { version } = JSON.parse(readFileSync('package.json', 'utf8'));
+          if (!/^\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?$/.test(version)) throw new Error('Invalid package version');
+          appendFileSync(process.env.GITHUB_OUTPUT, `version=${version}\n`);
+          JS
+      - name: Test deployment helper
+        run: node --test pipeline/deploy/render/deploy.test.mjs
+      # Keep plugin invocations separate: mixed core/plugin filters can select
+      # only core projects in the upstream test router.
+      - name: Test Workboard
+        working-directory: source
+        env:
+          OPENCLAW_VITEST_MAX_WORKERS: 2
+        run: pnpm test extensions/workboard --reporter=verbose --passWithNoTests=false
+      - name: Test OpenAI
+        working-directory: source
+        env:
+          OPENCLAW_VITEST_MAX_WORKERS: 2
+        run: pnpm test extensions/openai --reporter=verbose --passWithNoTests=false
+      - name: Test Codex
+        working-directory: source
+        env:
+          OPENCLAW_VITEST_MAX_WORKERS: 2
+        run: >-
+          pnpm test
+          extensions/codex/src/app-server/client.test.ts
+          extensions/codex/src/node-exec-server.test.ts
+          --reporter=verbose --passWithNoTests=false
+      - name: Test custom auth and provider attribution
+        working-directory: source
+        env:
+          OPENCLAW_VITEST_MAX_WORKERS: 2
+        run: >-
+          pnpm test
+          src/agents/auth-profiles/agent-configured-profile.test.ts
+          src/agents/provider-request-config.test.ts
+          src/agents/provider-attribution.test.ts
+          src/agents/openai-transport-stream.base.test.ts
+          test/scripts/codex-install-assertions.test.ts
+          test/scripts/codex-client-version-contract.test.ts
+          --reporter=verbose --passWithNoTests=false
+      - name: Free disposable runner space for the full image
+        run: |
+          rm -rf source/node_modules
+          sudo rm -rf /usr/local/lib/android /usr/share/dotnet /opt/ghc /opt/hostedtoolcache/CodeQL
+      - uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4.3.0
+      - name: Build full upstream image
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7
+        with:
+          context: source
+          file: source/Dockerfile
+          platforms: linux/amd64
+          load: true
+          push: false
+          tags: openclaw-render:tested
+          labels: org.opencontainers.image.revision=${{ steps.source.outputs.sha }}
+          build-args: |
+            OPENCLAW_INSTALL_BROWSER=1
+            OPENCLAW_EXTENSIONS=codex,diagnostics-otel
+            GIT_COMMIT=${{ steps.source.outputs.sha }}
+            OPENCLAW_DOCKER_BUILD_VERSION=${{ steps.version.outputs.version }}
+      - name: Smoke CLI, gateway readiness, and UI from the image
+        env:
+          SOURCE_SHA: ${{ steps.source.outputs.sha }}
+          IMAGE_VERSION: ${{ steps.version.outputs.version }}
+        run: node pipeline/deploy/render/smoke-image.mjs openclaw-render:tested
+      - name: Export tested image
+        run: |
+          docker buildx prune --all --force
+          docker save --output "$RUNNER_TEMP/openclaw-render.tar" openclaw-render:tested
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: render-image-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/openclaw-render.tar
+          compression-level: 0
+          retention-days: 1
+          if-no-files-found: error
+
+  publish:
+    needs: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    outputs:
+      image: ${{ steps.publish.outputs.image }}
+    # A fresh runner prevents source_ref tests from accessing the OIDC endpoint.
+    # Never execute candidate source or containers in this credentialed job.
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      SOURCE_SHA: ${{ needs.build.outputs.source_sha }}
+      IMAGE_REPOSITORY: ${{ vars.ECR_IMAGE_REPOSITORY }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.workflow_sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: 24.19.0
+          package-manager-cache: false
+      - uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5
+        with:
+          name: render-image-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/render-image
+      - name: Load tested image and check identity
+        run: |
+          test "$IMAGE_REPOSITORY" = public.ecr.aws/p9u4c4e7/openclaw-gateway
+          docker load --input "$RUNNER_TEMP/render-image/openclaw-render.tar"
+          test "$(docker image inspect --format '{{ index .Config.Labels "org.opencontainers.image.revision" }}' openclaw-render:tested)" = "$SOURCE_SHA"
+          rm "$RUNNER_TEMP/render-image/openclaw-render.tar"
+      - uses: aws-actions/configure-aws-credentials@61815dcd50bd041e203e49132bacad1fd04d2708 # v5
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: us-east-1
+          role-session-name: render-${{ github.run_id }}-${{ github.run_attempt }}
+          allowed-account-ids: 483461801575
+      - name: Push tested image and verify registry digest
+        id: publish
+        run: |
+          aws ecr-public get-login-password --region us-east-1 | docker login --username AWS --password-stdin public.ecr.aws
+          run_tag="run-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
+          docker tag openclaw-render:tested "$IMAGE_REPOSITORY:sha-$SOURCE_SHA"
+          docker tag openclaw-render:tested "$IMAGE_REPOSITORY:$run_tag"
+          docker push "$IMAGE_REPOSITORY:sha-$SOURCE_SHA"
+          docker push "$IMAGE_REPOSITORY:$run_tag"
+          digest="$(aws ecr-public describe-images --repository-name openclaw-gateway --image-ids imageTag="$run_tag" --query 'imageDetails[0].imageDigest' --output text)"
+          [[ "$digest" =~ ^sha256:[a-f0-9]{64}$ ]]
+          docker image inspect --format '{{range .RepoDigests}}{{println .}}{{end}}' "$IMAGE_REPOSITORY:$run_tag" | grep -Fx "$IMAGE_REPOSITORY@$digest"
+          test "$(aws ecr-public describe-images --repository-name openclaw-gateway --image-ids imageTag="sha-$SOURCE_SHA" --query 'imageDetails[0].imageDigest' --output text)" = "$digest"
+          echo "image=$IMAGE_REPOSITORY@$digest" >> "$GITHUB_OUTPUT"
+          printf 'Source: `%s`\n\nTested image: `%s@%s`\n\nRun tag: `%s`\n' "$SOURCE_SHA" "$IMAGE_REPOSITORY" "$digest" "$run_tag" >> "$GITHUB_STEP_SUMMARY"
+      - name: Registry logout
+        if: always()
+        run: docker logout public.ecr.aws
+
+  deploy:
+    needs: [build, publish]
+    if: (github.event_name == 'workflow_dispatch' && inputs.deploy) || (github.event_name == 'push' && vars.RENDER_AUTO_DEPLOY == 'true')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    # Only this job can access the environment-scoped Render key. The environment
+    # permits main only; publish stays environment-free to preserve its OIDC subject.
+    environment: render-production
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.workflow_sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: 24.19.0
+          package-manager-cache: false
+      - name: Deploy current main to Render
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
+          RENDER_SERVICE_ID: ${{ vars.RENDER_SERVICE_ID }}
+          SOURCE_SHA: ${{ needs.build.outputs.source_sha }}
+          IMAGE_URL: ${{ needs.publish.outputs.image }}
+        run: node deploy/render/deploy.mjs
