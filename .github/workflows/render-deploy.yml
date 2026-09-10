@@ -102,6 +102,7 @@ jobs:
           pnpm test
           extensions/codex/src/app-server/client.test.ts
           extensions/codex/src/node-exec-server.test.ts
+          extensions/codex/src/node-exec-server.readiness.test.ts
           --reporter=verbose --passWithNoTests=false
       - name: Test custom auth and provider attribution
         working-directory: source
@@ -115,6 +116,17 @@ jobs:
           src/agents/openai-transport-stream.base.test.ts
           test/scripts/codex-install-assertions.test.ts
           test/scripts/codex-client-version-contract.test.ts
+          --reporter=verbose --passWithNoTests=false
+      - name: Test agent account pins and Workboard controls
+        working-directory: source
+        env:
+          OPENCLAW_VITEST_MAX_WORKERS: 2
+        run: >-
+          pnpm test
+          ui/src/pages/agents/auth-pins.test.ts
+          ui/src/pages/agents/agents-page.test.ts
+          extensions/workboard/browser/lib/workboard/index.test.ts
+          extensions/workboard/browser/pages/workboard/workboard-page.test.ts
           --reporter=verbose --passWithNoTests=false
       - name: Free disposable runner space for the full image
         run: |
