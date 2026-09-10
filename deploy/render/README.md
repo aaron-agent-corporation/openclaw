@@ -8,12 +8,12 @@ Cloudflare routing stay in place.
 
 Repository settings:
 
-| Setting | Value |
-| --- | --- |
-| Variable `AWS_ROLE_ARN` | `arn:aws:iam::483461801575:role/OpenClawRenderGitHubDeploy` |
-| Variable `ECR_IMAGE_REPOSITORY` | `public.ecr.aws/p9u4c4e7/openclaw-gateway` |
-| Variable `RENDER_SERVICE_ID` | `srv-dacu5ru1egvs7390isd0` |
-| Variable `RENDER_AUTO_DEPLOY` | `false` initially |
+| Setting                         | Value                                                       |
+| ------------------------------- | ----------------------------------------------------------- |
+| Variable `AWS_ROLE_ARN`         | `arn:aws:iam::483461801575:role/OpenClawRenderGitHubDeploy` |
+| Variable `ECR_IMAGE_REPOSITORY` | `public.ecr.aws/p9u4c4e7/openclaw-gateway`                  |
+| Variable `RENDER_SERVICE_ID`    | `srv-dacu5ru1egvs7390isd0`                                  |
+| Variable `RENDER_AUTO_DEPLOY`   | `false` initially                                           |
 
 Create the GitHub Environment `render-production` with a custom deployment
 branch policy allowing the `main` branch only (no tag rules). Store the

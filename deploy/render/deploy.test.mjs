@@ -14,7 +14,14 @@ const env = {
   RENDER_API_KEY: "test-render-key",
   GH_TOKEN: "test-github-key",
 };
-function fixture({ main = source, status = "live", liveDigest = digest, failPost = false, pending = false, alreadyLive = false } = {}) {
+function fixture({
+  main = source,
+  status = "live",
+  liveDigest = digest,
+  failPost = false,
+  pending = false,
+  alreadyLive = false,
+} = {}) {
   const calls = [];
   const messages = [];
   let time = 0;
@@ -24,38 +31,62 @@ function fixture({ main = source, status = "live", liveDigest = digest, failPost
     registryCredential: { id: "credential-1" },
     suspended: "not_suspended",
   };
-  const run = (overrides = {}) => deployRender({
-    env: { ...env, ...overrides },
-    timeoutMs: 20_000,
-    now: () => time,
-    sleep: async (delay) => { time += delay; },
-    report: (message) => messages.push(message),
-    fetchImpl: async (url, options) => {
-      calls.push({ url, method: options.method, body: options.body && JSON.parse(options.body) });
-      let data;
-      if (url.includes("api.github.com")) data = { sha: main };
-      else if (url.endsWith("/deploys?limit=20")) data = [{ deploy: { id: "old-deploy", status: pending ? "queued" : "live", image: { ref: service.imagePath, sha: alreadyLive ? digest : `sha256:${"c".repeat(64)}` } } }];
-      else if (options.method === "PATCH") {
-        service = { ...service, imagePath: JSON.parse(options.body).image.imagePath };
-        data = service;
-      } else if (options.method === "POST") {
-        if (failPost) throw new Error("Lost response after server may have accepted the write");
-        data = { id: "new-deploy" };
-      } else if (url.endsWith("/deploys/new-deploy")) data = { id: "new-deploy", status, image: { ref: image, sha: liveDigest } };
-      else data = service;
-      return new Response(JSON.stringify(data), { status: 200 });
-    },
-  });
+  const run = (overrides = {}) =>
+    deployRender({
+      env: { ...env, ...overrides },
+      timeoutMs: 20_000,
+      now: () => time,
+      sleep: async (delay) => {
+        time += delay;
+      },
+      report: (message) => messages.push(message),
+      fetchImpl: async (url, options) => {
+        calls.push({ url, method: options.method, body: options.body && JSON.parse(options.body) });
+        let data;
+        if (url.includes("api.github.com")) data = { sha: main };
+        else if (url.endsWith("/deploys?limit=20"))
+          data = [
+            {
+              deploy: {
+                id: "old-deploy",
+                status: pending ? "queued" : "live",
+                image: {
+                  ref: service.imagePath,
+                  sha: alreadyLive ? digest : `sha256:${"c".repeat(64)}`,
+                },
+              },
+            },
+          ];
+        else if (options.method === "PATCH") {
+          service = { ...service, imagePath: JSON.parse(options.body).image.imagePath };
+          data = service;
+        } else if (options.method === "POST") {
+          if (failPost) throw new Error("Lost response after server may have accepted the write");
+          data = { id: "new-deploy" };
+        } else if (url.endsWith("/deploys/new-deploy"))
+          data = { id: "new-deploy", status, image: { ref: image, sha: liveDigest } };
+        else data = service;
+        return new Response(JSON.stringify(data), { status: 200 });
+      },
+    });
   return { run, calls, messages };
 }
 
 test("stages the digest, preserves registry credential, deploys once, and verifies live digest", async () => {
   const { run, calls, messages } = fixture();
   assert.equal((await run()).id, "new-deploy");
-  assert.deepEqual(calls.filter((call) => call.method !== "GET").map(({ method, body }) => ({ method, body })), [
-    { method: "PATCH", body: { image: { imagePath: image, ownerId: "owner-1", registryCredentialId: "credential-1" } } },
-    { method: "POST", body: { imageUrl: image, clearCache: "do_not_clear" } },
-  ]);
+  assert.deepEqual(
+    calls.filter((call) => call.method !== "GET").map(({ method, body }) => ({ method, body })),
+    [
+      {
+        method: "PATCH",
+        body: {
+          image: { imagePath: image, ownerId: "owner-1", registryCredentialId: "credential-1" },
+        },
+      },
+      { method: "POST", body: { imageUrl: image, clearCache: "do_not_clear" } },
+    ],
+  );
   assert(messages.some((message) => message.includes("gateway:previous")));
   assert(!messages.join("\n").includes("test-render-key"));
 });
@@ -87,7 +118,11 @@ test("an uncertain POST is never retried or rolled back", async () => {
   assert(messages.some((message) => message.includes("Previous configured image")));
 });
 
-for (const options of [{ status: "update_failed" }, { liveDigest: `sha256:${"e".repeat(64)}` }, { status: "update_in_progress" }]) {
+for (const options of [
+  { status: "update_failed" },
+  { liveDigest: `sha256:${"e".repeat(64)}` },
+  { status: "update_in_progress" },
+]) {
   test(`failure remains visible without rollback: ${JSON.stringify(options)}`, async () => {
     const { run, calls } = fixture(options);
     await assert.rejects(run(), /No rollback was attempted/);
