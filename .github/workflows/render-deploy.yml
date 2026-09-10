@@ -76,9 +76,11 @@ jobs:
         run: |
           node --input-type=module <<'JS'
           import { readFileSync, appendFileSync } from 'node:fs';
+          import { REQUIRED_RENDER_PLUGINS } from '../pipeline/deploy/render/required-plugins.mjs';
           const { version } = JSON.parse(readFileSync('package.json', 'utf8'));
           if (!/^\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?$/.test(version)) throw new Error('Invalid package version');
           appendFileSync(process.env.GITHUB_OUTPUT, `version=${version}\n`);
+          appendFileSync(process.env.GITHUB_OUTPUT, `plugins=${REQUIRED_RENDER_PLUGINS.join(',')}\n`);
           JS
       # Continue independent checks for complete feedback. The required outcome
       # barrier below owns success; continue-on-error conclusions are not proof.
@@ -293,7 +295,7 @@ jobs:
           labels: org.opencontainers.image.revision=${{ steps.source.outputs.sha }}
           build-args: |
             OPENCLAW_INSTALL_BROWSER=1
-            OPENCLAW_EXTENSIONS=codex,diagnostics-otel
+            OPENCLAW_EXTENSIONS=${{ steps.version.outputs.plugins }}
             GIT_COMMIT=${{ steps.source.outputs.sha }}
             OPENCLAW_DOCKER_BUILD_VERSION=${{ steps.version.outputs.version }}
       - name: Smoke CLI, gateway readiness, and UI from the image

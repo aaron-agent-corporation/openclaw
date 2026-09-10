@@ -6,6 +6,11 @@ tests the resulting Linux AMD64 image. It publishes that same image to
 `public.ecr.aws/p9u4c4e7/openclaw-gateway`. The existing Render service and
 Cloudflare routing stay in place.
 
+`required-plugins.mjs` is the shared image selection and smoke-test inventory.
+It includes every configured production plugin, including externally distributed
+plugins that upstream's default Docker build omits. The image smoke imports each
+packaged entrypoint and verifies its manifest ID before starting the gateway.
+
 Repository settings:
 
 | Setting                         | Value                                                       |

@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import { randomBytes } from "node:crypto";
 import { setTimeout } from "node:timers/promises";
+import { REQUIRED_RENDER_PLUGINS } from "./required-plugins.mjs";
 import { verifyUiAssets } from "./verify-ui-assets.mjs";
 
 const image = process.argv[2];
@@ -24,12 +25,22 @@ const info = JSON.parse(
     "-e",
     `
   const fs = require('node:fs');
+  (async () => {
+  const plugins = ${JSON.stringify(REQUIRED_RENDER_PLUGINS)};
+  for (const id of plugins) {
+    const root = '/app/dist/extensions/' + id;
+    const manifest = JSON.parse(fs.readFileSync(root + '/openclaw.plugin.json', 'utf8'));
+    require('node:assert/strict').equal(manifest.id, id);
+    await import(root + '/index.js');
+  }
   console.log(JSON.stringify({
     uid: process.getuid(),
     packageVersion: require('/app/package.json').version,
     codexVersion: require('/app/extensions/codex/node_modules/@openai/codex/package.json').version,
-    build: JSON.parse(fs.readFileSync('/app/dist/build-info.json', 'utf8'))
+    build: JSON.parse(fs.readFileSync('/app/dist/build-info.json', 'utf8')),
+    plugins
   }));
+  })().catch(error => { console.error(error); process.exitCode = 1; });
 `,
   ),
 );
@@ -37,6 +48,8 @@ assert.notEqual(info.uid, 0);
 assert.equal(info.packageVersion, version);
 assert.equal(info.build.version, version);
 assert.equal(info.build.commit, sha);
+assert.deepEqual(info.plugins, REQUIRED_RENDER_PLUGINS);
+console.log(`Image contains and imports all ${info.plugins.length} required Render plugins`);
 const cli = docker("run", "--rm", image, "node", "openclaw.mjs", "--version");
 assert(cli.includes(version), `CLI did not report expected version ${version}`);
 console.log(`Image CLI: ${cli}; uid=${info.uid}; commit=${sha}`);
