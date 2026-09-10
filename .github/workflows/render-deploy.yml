@@ -80,6 +80,48 @@ jobs:
           if (!/^\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?$/.test(version)) throw new Error('Invalid package version');
           appendFileSync(process.env.GITHUB_OUTPUT, `version=${version}\n`);
           JS
+      - name: Check production types
+        working-directory: source
+        run: pnpm tsgo:prod
+      - name: Check plugin test types
+        working-directory: source
+        run: pnpm tsgo:extensions:test
+      - name: Verify Control UI translations
+        working-directory: source
+        run: pnpm ui:i18n:verify
+      # These owner paths follow the retained auth, provider, and Workboard
+      # features across releases. Keep core and plugin type contexts separate.
+      - name: Lint retained core and Control UI features
+        working-directory: source
+        run: >-
+          node scripts/run-oxlint.mjs --tsconfig config/tsconfig/oxlint.core.json
+          src/agents/agent-scope-config*
+          src/agents/auth-profiles.ts src/agents/auth-profiles
+          src/agents/provider-attribution* src/agents/provider-request-config*
+          src/agents/openai-transport-stream*
+          src/auto-reply/reply/get-reply-run-admission.ts
+          src/config/*agents* src/config/config-misc.test.ts
+          src/config/schema.labels.ts src/config/zod-schema.agent-runtime.ts
+          src/gateway/server-methods/models-auth-status*
+          src/gateway/session-utils-row.ts
+          src/gateway/worker-environments/inference-runtime.ts
+          packages/gateway-protocol/src/schema/sessions-row.ts
+          packages/workboard-contract
+          ui/src/lib/agents ui/src/pages/agents
+          ui/src/pages/chat/chat-pane-session-controls*
+          ui/src/pages/model-providers ui/src/pages/sessions
+          ui/src/i18n/locales/en.ts
+      - name: Lint retained plugins and Workboard browser features
+        working-directory: source
+        run: >-
+          node scripts/run-oxlint.mjs --tsconfig extensions/tsconfig.json
+          extensions/codex extensions/openai extensions/workboard
+      - name: Lint Codex release and media smoke scripts
+        working-directory: source
+        run: >-
+          node scripts/run-oxlint.mjs --tsconfig config/tsconfig/oxlint.scripts.json
+          scripts/e2e/lib/codex-media-path
+          scripts/e2e/lib/codex-release-package-assertions.mjs
       - name: Test deployment helper
         run: node --test pipeline/deploy/render/deploy.test.mjs
       # Keep plugin invocations separate: mixed core/plugin filters can select
