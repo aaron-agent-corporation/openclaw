@@ -2,6 +2,7 @@ import { vi } from "vitest";
 import type { GatewayBrowserClient } from "../../api/gateway.ts";
 import type {
   AgentsFilesListResult,
+  AgentsListResult,
   ModelAuthStatusResult,
   ModelCatalogEntry,
   ToolsEffectiveResult,
@@ -106,4 +107,79 @@ export function gateway(current: ApplicationGatewaySnapshot): ApplicationContext
     snapshot: current,
     subscribe: vi.fn(() => () => undefined),
   } as unknown as ApplicationContext["gateway"];
+}
+
+export const files = (agentId: string, workspace: string) => ({ agentId, workspace, files: [] });
+
+export const agentsList: AgentsListResult = {
+  defaultId: "main",
+  mainKey: "main",
+  scope: "per-sender",
+  agents: [{ id: "main", name: "Main" }],
+};
+
+export function agentsRouteData(
+  currentGateway: ApplicationContext["gateway"],
+  roster: AgentsListResult | null = agentsList,
+  requestedAgentId: string | null = "main",
+): AgentsRouteData {
+  const pathname = requestedAgentId ? `/settings/agents/${requestedAgentId}` : "/settings/agents";
+  return {
+    gateway: currentGateway,
+    gatewaySnapshot: currentGateway.snapshot,
+    location: { pathname, search: "", hash: "" },
+    requestedAgentId,
+    panel: "files",
+    agentsList: roster,
+    error: null,
+  };
+}
+
+export function agentsCapability(ensureFiles: () => Promise<AgentsFilesListResult>) {
+  return {
+    state: {
+      client: null,
+      connected: true,
+      agentsLoading: false,
+      agentsError: null,
+      agentsList,
+    },
+    files: () => ({ list: null, loading: false, error: null }),
+    ensureList: vi.fn(async () => agentsList),
+    refreshList: vi.fn(async () => agentsList),
+    ensureFiles,
+    refreshFiles: ensureFiles,
+    subscribe: vi.fn(() => () => undefined),
+  } as unknown as ApplicationContext["agents"];
+}
+
+export function pageContext(
+  currentGateway: ApplicationContext["gateway"],
+  agents: ApplicationContext["agents"],
+  options?: {
+    agentIdentity?: ApplicationContext["agentIdentity"];
+    sessions?: ApplicationContext["sessions"];
+  },
+): ApplicationContext {
+  const subscribe = vi.fn(() => () => undefined);
+  return {
+    gateway: currentGateway,
+    agents,
+    agentIdentity:
+      options?.agentIdentity ??
+      ({
+        get: () => ({ agentId: "main" }),
+        entries: () => [],
+        ensure: vi.fn(async () => undefined),
+        subscribe,
+      } as unknown as ApplicationContext["agentIdentity"]),
+    sessions:
+      options?.sessions ??
+      ({
+        state: { result: null, modelOverrides: {} },
+        subscribe,
+      } as unknown as ApplicationContext["sessions"]),
+    channels: { subscribe },
+    runtimeConfig: { subscribe },
+  } as unknown as ApplicationContext;
 }

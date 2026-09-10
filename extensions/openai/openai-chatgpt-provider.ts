@@ -198,10 +198,7 @@ function normalizeCodexTransport(model: ProviderRuntimeModel): ProviderRuntimeMo
     normalizeLowercaseStringOrEmpty(model.name) === OPENAI_CODEX_GPT_54_LEGACY_MODEL_ID
       ? OPENAI_CODEX_GPT_54_MODEL_ID
       : model.name;
-  const normalizedTransport = normalizeCodexTransportFields({
-    api: model.api,
-    baseUrl: model.baseUrl,
-  });
+  const normalizedTransport = normalizeCodexTransportFields(model);
   const api = normalizedTransport.api ?? model.api;
   const baseUrl = normalizedTransport.baseUrl ?? model.baseUrl;
   // The ChatGPT backend gates newer models on the caller's Codex version, so

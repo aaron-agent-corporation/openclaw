@@ -241,11 +241,11 @@ export function createWorkboardAutoAdvanceService(params: {
     if (backingOff && trigger !== "manual" && trigger !== "gateway-start") {
       return;
     }
-    const startGate = (board: WorkboardBoardMetadata | undefined) =>
+    const startGate = (currentBoard: WorkboardBoardMetadata | undefined) =>
       generation === owner &&
       ready &&
-      board !== undefined &&
-      workboardBoardAutoAdvanceEnabled(board);
+      currentBoard !== undefined &&
+      workboardBoardAutoAdvanceEnabled(currentBoard);
     let result: WorkboardDispatchAndStartResult;
     state.passStartedAt = passAt;
     try {
@@ -329,7 +329,10 @@ export function createWorkboardAutoAdvanceService(params: {
   };
 
   const runPass = async (owner: number): Promise<void> => {
-    while (pending && generation === owner) {
+    while (pending) {
+      if (generation !== owner) {
+        return;
+      }
       const batch = pending;
       pending = undefined;
       let boards: WorkboardBoardSummary[];
@@ -459,7 +462,10 @@ export function createWorkboardAutoAdvanceService(params: {
       });
     },
     async settle() {
-      while (timer || inFlight || (pending && ready)) {
+      for (;;) {
+        if (!timer && !inFlight && !(pending && ready)) {
+          return;
+        }
         if (timer) {
           clearTimeout(timer);
           startPass();

@@ -130,7 +130,7 @@ export function renderAgentOverview(params: {
   const fallbackChips = modelFallbacks ?? [];
   const disabled = !params.canUpdateConfig || !configForm || configLoading || configSaving;
   const thinkingDefault = agent.thinkingDefault ?? "-";
-  const authProfiles = { ...(config.entry?.auth?.profiles ?? {}) };
+  const authProfiles = { ...config.entry?.auth?.profiles };
   const pinnedProviders = collectPinnedProviderIds(authProfiles);
   const modelOptions = orderModelOptionsForAuthPins(
     buildModelOptions(configForm, effectivePrimary ?? undefined, params.modelCatalog, agent.id),
