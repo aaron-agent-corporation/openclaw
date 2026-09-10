@@ -377,6 +377,12 @@ class AgentsPage
     }
   }
 
+  override updated() {
+    if (this.isConnected && this.authWizardState.phase !== "idle") {
+      this.querySelector("openclaw-modal-dialog")?.setReturnFocusTarget(this.authWizardReturnFocus);
+    }
+  }
+
   private syncGatewayState() {
     if (this.cron.client !== this.client || this.cron.connected !== this.connected) {
       // In-flight cron loaders mutate their captured state; same-client

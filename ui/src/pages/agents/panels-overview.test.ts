@@ -2,6 +2,7 @@
 import { render } from "lit";
 import { describe, expect, it, vi } from "vitest";
 import type { MultiSelect } from "../../components/multi-select.ts";
+import { t } from "../../i18n/index.ts";
 import { buildAgentContext } from "../../lib/agents/display.ts";
 import { createAgentViewTestProps as createProps } from "./agents-view.test-helpers.ts";
 import { renderAgents } from "./view.ts";
@@ -95,6 +96,9 @@ it.each(["overview", "channels", "cron"] as const)(
 
     expect(contextValue("Workspace")).toBe(resolvedAgentWorkspace);
     expect(contextValue("Primary Model")).toBe(`${inheritedAgentModel} (+1 fallback)`);
+    if (activePanel === "overview") {
+      expect(container.textContent).toContain(t("agents.overview.authPinsHelp"));
+    }
   },
 );
 

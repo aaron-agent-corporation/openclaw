@@ -360,7 +360,7 @@ export function renderAgentOverview(params: {
         ${renderSettingsRow({
           title: t("agents.overview.authPins"),
           stacked: true,
-          help: t("agents.overview.authPinsHelp"),
+          description: t("agents.overview.authPinsHelp"),
           control: renderAgentAuthPinsPanel({
             agentId: agent.id,
             authProfiles,
