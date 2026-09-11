@@ -14,7 +14,6 @@ import {
 } from "./auth-profiles.js";
 import { ensureAuthProfileStore, saveAuthProfileStore } from "./auth-profiles/store-runtime.js";
 import type { EmbeddedRunAttemptResult } from "./embedded-agent-runner/run/types.js";
-import type { AgentHarness } from "./harness/types.js";
 import {
   buildEmbeddedRunnerAssistant as buildAssistant,
   makeEmbeddedRunnerAttempt as makeAttempt,
@@ -106,7 +105,6 @@ let createDiagnosticLogRecordCaptureFn: typeof import("../logging/test-helpers/d
 let cleanupLogCapture: (() => void) | undefined;
 let resetLoggerFn: typeof import("../logging/logger.js").resetLogger;
 let setLoggerOverrideFn: typeof import("../logging/logger.js").setLoggerOverride;
-let registerAgentHarnessFn: typeof import("./harness/registry.js").registerAgentHarness;
 const originalFetch = globalThis.fetch;
 
 beforeAll(async () => {
@@ -119,7 +117,6 @@ beforeAll(async () => {
     await import("../logging/test-helpers/diagnostic-log-capture.js"));
   ({ resetLogger: resetLoggerFn, setLoggerOverride: setLoggerOverrideFn } =
     await import("../logging/logger.js"));
-  ({ registerAgentHarness: registerAgentHarnessFn } = await import("./harness/registry.js"));
 });
 
 type RunEmbeddedAgentTestParams = Parameters<typeof runEmbeddedAgent>[0] & {
@@ -1281,76 +1278,94 @@ describe("runEmbeddedAgent auth profile rotation", () => {
     });
   });
 
-  it("preserves a transient plugin-harness probe after a billing-disabled user pin", async () => {
-    await withTimedAgentWorkspace(async ({ agentDir, workspaceDir, now }) => {
-      saveAuthProfileStore(
-        {
-          version: 1,
-          profiles: {
-            "openai:pinned": {
-              type: "token",
-              provider: "openai",
-              token: "subscription-pinned",
+  it.each(["billing-disabled pin", "reset pinned subscription"] as const)(
+    "recovers a plugin-harness cooldown probe with a %s",
+    async (scenario) => {
+      const billingDisabled = scenario === "billing-disabled pin";
+      await withTimedAgentWorkspace(async ({ agentDir, workspaceDir, now }) => {
+        saveAuthProfileStore(
+          {
+            version: 1,
+            profiles: {
+              "openai:pinned": {
+                type: "token",
+                provider: "openai",
+                token: "subscription-pinned",
+              },
+              ...(billingDisabled
+                ? {
+                    "openai:backup": {
+                      type: "token" as const,
+                      provider: "openai",
+                      token: "subscription-backup",
+                    },
+                  }
+                : {}),
             },
-            "openai:backup": {
-              type: "token",
-              provider: "openai",
-              token: "subscription-backup",
+            order: {
+              openai: billingDisabled ? ["openai:pinned", "openai:backup"] : ["openai:pinned"],
+            },
+            usageStats: {
+              "openai:pinned": billingDisabled
+                ? {
+                    disabledUntil: now + 60 * 60 * 1000,
+                    disabledReason: "billing",
+                  }
+                : {
+                    blockedUntil: now + 5 * 24 * 60 * 60 * 1000,
+                    blockedReason: "subscription_limit",
+                    blockedSource: "codex-app-server",
+                  },
+              "openai:backup": {
+                cooldownUntil: now + 60 * 60 * 1000,
+                failureCounts: { rate_limit: 1 },
+              },
             },
           },
-          order: { openai: ["openai:pinned", "openai:backup"] },
-          usageStats: {
-            "openai:pinned": {
-              disabledUntil: now + 60 * 60 * 1000,
-              disabledReason: "billing",
-            },
-            "openai:backup": {
-              cooldownUntil: now + 60 * 60 * 1000,
-              failureCounts: { rate_limit: 1 },
-            },
-          },
-        },
-        agentDir,
-      );
-      const harness: AgentHarness = {
-        id: "probe-harness",
-        label: "Probe harness",
-        authBootstrap: "harness",
-        supports: (ctx) =>
-          ctx.requestedRuntime === "probe-harness"
-            ? { supported: true, priority: 100 }
-            : { supported: false, reason: "test harness requires an explicit runtime" },
-        runAttempt: async (attemptParams) => await runEmbeddedAttemptMock(attemptParams),
-      };
-      registerAgentHarnessFn(harness);
-      mockSingleSuccessfulAttempt();
+          agentDir,
+        );
+        mockSingleSuccessfulAttempt();
 
-      await runEmbeddedAgentInline({
-        sessionId: "session:test",
-        sessionKey: "agent:test:plugin-harness-mixed-cooldown",
-        workspaceDir,
-        agentDir,
-        config: makeConfig(),
-        prompt: "hello",
-        provider: "openai",
-        model: "chatgpt-mock",
-        agentHarnessId: "probe-harness",
-        authProfileId: "openai:pinned",
-        authProfileIdSource: "user",
-        allowTransientCooldownProbe: true,
-        timeoutMs: 5_000,
-        runId: "run:plugin-harness-mixed-cooldown",
+        const result = await runEmbeddedAgentInline({
+          sessionId: "session:test",
+          sessionKey: "agent:test:plugin-harness-mixed-cooldown",
+          workspaceDir,
+          agentDir,
+          config: { agents: { list: [{ id: "test" }] } },
+          prompt: "hello",
+          provider: "openai",
+          model: "chatgpt-mock",
+          agentHarnessId: "codex",
+          authProfileId: "openai:pinned",
+          authProfileIdSource: "user",
+          allowTransientCooldownProbe: true,
+          timeoutMs: 5_000,
+          runId: "run:plugin-harness-mixed-cooldown",
+        });
+
+        expect(runEmbeddedAttemptMock).toHaveBeenCalledOnce();
+        const attemptParams = requireRecord(
+          runEmbeddedAttemptMock.mock.calls[0]?.[0],
+          "plugin harness attempt params",
+        );
+        expect(attemptParams.authProfileId).toBe(
+          billingDisabled ? "openai:backup" : "openai:pinned",
+        );
+        expect(attemptParams.authProfileIdSource).toBe(billingDisabled ? "auto" : "user");
+        expect(attemptParams.agentHarnessId).toBe("codex");
+        expect(attemptParams.resolvedApiKey).toBeUndefined();
+        expect(result.payloads?.[0]?.text).toBe("ok");
+        const usageStats = await readUsageStats(agentDir);
+        if (billingDisabled) {
+          expect(usageStats["openai:pinned"]?.disabledReason).toBe("billing");
+        } else {
+          expect(usageStats["openai:pinned"]?.blockedUntil).toBeUndefined();
+          expect(usageStats["openai:pinned"]?.blockedReason).toBeUndefined();
+          expect(usageStats["openai:pinned"]?.lastUsed).toBe(now);
+        }
       });
-
-      expect(runEmbeddedAttemptMock).toHaveBeenCalledOnce();
-      const attemptParams = requireRecord(
-        runEmbeddedAttemptMock.mock.calls[0]?.[0],
-        "plugin harness attempt params",
-      );
-      expect(attemptParams.authProfileId).toBe("openai:backup");
-      expect(attemptParams.authProfileIdSource).toBe("auto");
-    });
-  });
+    },
+  );
 
   it("ignores a user-pinned profile when the provider mismatches", async () => {
     await withAgentWorkspace(async ({ agentDir, workspaceDir }) => {

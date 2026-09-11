@@ -366,7 +366,6 @@ export async function prepareEmbeddedRunRuntime(input: {
   const cooldownProbePolicy = resolveEmbeddedAuthCooldownProbePolicy({
     authStore: attemptAuthProfileStore,
     profileCandidates,
-    lockedProfileId,
     modelId,
     allowTransientCooldownProbe: params.allowTransientCooldownProbe === true,
   });

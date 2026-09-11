@@ -583,6 +583,8 @@ describe("createEmbeddedRunAuthController", () => {
         setRuntimeApiKey: vi.fn(),
         profileCandidates: [profileId],
         fallbackConfigured: true,
+        lockedProfileId: profileId,
+        allowTransientCooldownProbe: true,
         authStore: {
           version: 1,
           profiles: {
@@ -610,6 +612,7 @@ describe("createEmbeddedRunAuthController", () => {
         reason: disabledReason,
         authMode: "oauth",
       });
+      expect(mocks.getApiKeyForModelCore).not.toHaveBeenCalled();
     },
   );
 
@@ -643,7 +646,53 @@ describe("createEmbeddedRunAuthController", () => {
     expect(harness.profileIndex).toBe(2);
   });
 
-  it("only enables transient cooldown probing when every automatic profile is transiently cooled", () => {
+  it.each([
+    { label: "a sole pinned profile", profileCandidates: ["pinned"] },
+    { label: "the pin before a cooled backup", profileCandidates: ["pinned", "backup"] },
+  ])("retries $label during an authorized quota recovery probe", async ({ profileCandidates }) => {
+    const harness = createMutableAuthControllerHarness();
+    const setRuntimeApiKey = vi.fn<(provider: string, apiKey: string) => void>();
+    const blockedUntil = Date.now() + 24 * 60 * 60 * 1000;
+    const authStore: AuthProfileStore = {
+      version: 1,
+      profiles: Object.fromEntries(
+        profileCandidates.map((profileId) => [
+          profileId,
+          { type: "token" as const, provider: "custom-openai", token: `${profileId}-token` },
+        ]),
+      ),
+      usageStats: Object.fromEntries(
+        profileCandidates.map((profileId) => [
+          profileId,
+          { blockedUntil, blockedReason: "subscription_limit" as const },
+        ]),
+      ),
+    };
+    mocks.getApiKeyForModelCore.mockImplementation(async ({ profileId }) => ({
+      apiKey: `${String(profileId)}-token`,
+      mode: "token" as const,
+      profileId,
+      source: `profile:${String(profileId)}`,
+    }));
+    mocks.prepareProviderRuntimeAuth.mockResolvedValue(undefined);
+    const controller = createMutableEmbeddedRunAuthController({
+      harness,
+      setRuntimeApiKey,
+      profileCandidates,
+      lockedProfileId: "pinned",
+      allowTransientCooldownProbe: true,
+      authStore,
+    });
+
+    await controller.initializeAuthProfile();
+
+    expect(harness.lastProfileId).toBe("pinned");
+    expect(setRuntimeApiKey).toHaveBeenCalledWith("custom-openai", "pinned-token");
+    await expect(controller.advanceAuthProfile()).resolves.toBe(false);
+    expect(mocks.getApiKeyForModelCore).toHaveBeenCalledOnce();
+  });
+
+  it("only probes transient profiles when every prepared profile is unavailable", () => {
     const now = Date.now();
     const createStore = (
       usageStats: NonNullable<AuthProfileStore["usageStats"]>,
@@ -695,7 +744,6 @@ describe("createEmbeddedRunAuthController", () => {
         second: { disabledUntil: now + 60_000, disabledReason: "rate_limit" },
       }),
       profileCandidates: ["first", "second"],
-      lockedProfileId: "first",
       modelId: "test-model",
       allowTransientCooldownProbe: true,
     });
