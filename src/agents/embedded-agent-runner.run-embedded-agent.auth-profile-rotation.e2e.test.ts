@@ -1314,7 +1314,7 @@ describe("runEmbeddedAgent auth profile rotation", () => {
                 : {
                     blockedUntil: now + 5 * 24 * 60 * 60 * 1000,
                     blockedReason: "subscription_limit",
-                    blockedSource: "codex-app-server",
+                    blockedSource: "codex_rate_limits",
                   },
               "openai:backup": {
                 cooldownUntil: now + 60 * 60 * 1000,
