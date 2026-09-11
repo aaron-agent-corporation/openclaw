@@ -72,36 +72,26 @@ type LogLike = {
   warn(message: string): void;
 };
 
-/** Decides whether one automatic profile may bypass its current cooldown. */
+/** Selects transiently cooled profiles for one authorized recovery probe. */
 export function resolveEmbeddedAuthCooldownProbePolicy(params: {
   authStore: AuthProfileStore;
   profileCandidates: Array<string | undefined>;
-  lockedProfileId?: string;
   modelId: string;
   allowTransientCooldownProbe: boolean;
 }): { probeProfileIds: ReadonlySet<string>; unavailableReason: FailoverReason | null } {
-  const autoProfileCandidates = params.profileCandidates.filter(
-    (candidate): candidate is string =>
-      typeof candidate === "string" && candidate.length > 0 && candidate !== params.lockedProfileId,
+  const profileCandidates = params.profileCandidates.filter(
+    (candidate): candidate is string => typeof candidate === "string" && candidate.length > 0,
   );
-  const allAutoProfilesInCooldown =
-    autoProfileCandidates.length > 0 &&
-    autoProfileCandidates.every((candidate) =>
+  const allProfilesInCooldown =
+    profileCandidates.length > 0 &&
+    profileCandidates.every((candidate) =>
       isProfileInCooldown(params.authStore, candidate, undefined, params.modelId),
     );
-  const unavailableReason = allAutoProfilesInCooldown
-    ? (resolveProfilesUnavailableReason({
-        store: params.authStore,
-        profileIds: autoProfileCandidates,
-      }) ?? "unknown")
-    : null;
   const probeProfileIds = new Set<string>();
-  if (
-    params.allowTransientCooldownProbe &&
-    allAutoProfilesInCooldown &&
-    shouldUseTransientCooldownProbeSlot(unavailableReason)
-  ) {
-    for (const candidate of autoProfileCandidates) {
+  if (params.allowTransientCooldownProbe && allProfilesInCooldown) {
+    // Pins preserve preference, not stale quota state. Classify each profile so
+    // a persistent failure cannot consume the probe or suppress a transient one.
+    for (const candidate of profileCandidates) {
       const candidateReason =
         resolveProfilesUnavailableReason({
           store: params.authStore,
@@ -112,6 +102,12 @@ export function resolveEmbeddedAuthCooldownProbePolicy(params: {
       }
     }
   }
+  const unavailableReason = allProfilesInCooldown
+    ? (resolveProfilesUnavailableReason({
+        store: params.authStore,
+        profileIds: probeProfileIds.size > 0 ? [...probeProfileIds] : profileCandidates,
+      }) ?? "unknown")
+    : null;
   return { probeProfileIds, unavailableReason };
 }
 
@@ -667,7 +663,6 @@ export function createEmbeddedRunAuthController(params: {
       const cooldownProbePolicy = resolveEmbeddedAuthCooldownProbePolicy({
         authStore: params.authStore,
         profileCandidates: params.profileCandidates,
-        lockedProfileId: params.lockedProfileId,
         modelId,
         allowTransientCooldownProbe: params.allowTransientCooldownProbe,
       });
