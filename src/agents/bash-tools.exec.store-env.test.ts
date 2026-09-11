@@ -1,7 +1,9 @@
 /** Store-backed exec environment tests cover run snapshots, precedence, and security filtering. */
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { createTempDirTracker } from "../../test/helpers/temp-dir.js";
+import { quoteCliArg } from "../cli/quote-cli-arg.js";
 import { withInstallationTarget } from "../infra/installation-target-context.js";
+import { createProcessSupervisor } from "../process/supervisor/supervisor.js";
 import { looksLikeSecretSentinel, resolveSecretSentinel } from "../secrets/sentinel.js";
 import { writeSecretStoreEntry } from "../secrets/store/secret-store.js";
 import { closeOpenClawStateDatabaseForTest } from "../state/openclaw-state-db.js";
@@ -11,6 +13,7 @@ import type { BashSandboxConfig } from "./bash-tools.shared.js";
 
 const mocks = vi.hoisted(() => ({
   egressActive: false,
+  realSupervisor: undefined as ReturnType<typeof createProcessSupervisor> | undefined,
   proxyUrl: ["http://openclaw:", "fixture-password", "@127.0.0.1:19090"].join(""),
   gatewayParams: [] as Array<{
     env: Record<string, string>;
@@ -41,6 +44,7 @@ vi.mock("../secrets/egress-proxy/registry.js", () => ({
       SSL_CERT_FILE: "/state/secret-egress/root-ca.pem",
       CURL_CA_BUNDLE: "/state/secret-egress/root-ca.pem",
       REQUESTS_CA_BUNDLE: "/state/secret-egress/root-ca.pem",
+      GIT_SSL_CAINFO: "/state/secret-egress/root-ca.pem",
     };
   },
 }));
@@ -86,31 +90,35 @@ vi.mock("./bash-tools.exec-host-node.js", () => ({
 }));
 
 vi.mock("../process/supervisor/index.js", () => ({
-  getProcessSupervisor: () => ({
-    spawn: async (input: { env?: Record<string, string>; onStdout?: (chunk: string) => void }) => {
-      mocks.spawnInputs.push({ env: input.env ? { ...input.env } : undefined });
-      input.onStdout?.("ok\n");
-      return {
-        activity: { resultSettled: true, lastOutputAtMs: Date.now() },
-        runId: "mock-run",
-        startedAtMs: Date.now(),
-        stdin: undefined,
-        wait: async () => ({
-          reason: "exit" as const,
-          exitCode: 0,
-          exitSignal: null,
-          durationMs: 0,
-          stdout: "",
-          stderr: "",
-          timedOut: false,
-          noOutputTimedOut: false,
-        }),
-        cancel: vi.fn(),
-      };
+  getProcessSupervisor: () =>
+    mocks.realSupervisor ?? {
+      spawn: async (input: {
+        env?: Record<string, string>;
+        onStdout?: (chunk: string) => void;
+      }) => {
+        mocks.spawnInputs.push({ env: input.env ? { ...input.env } : undefined });
+        input.onStdout?.("ok\n");
+        return {
+          activity: { resultSettled: true, lastOutputAtMs: Date.now() },
+          runId: "mock-run",
+          startedAtMs: Date.now(),
+          stdin: undefined,
+          wait: async () => ({
+            reason: "exit" as const,
+            exitCode: 0,
+            exitSignal: null,
+            durationMs: 0,
+            stdout: "",
+            stderr: "",
+            timedOut: false,
+            noOutputTimedOut: false,
+          }),
+          cancel: vi.fn(),
+        };
+      },
+      cancel: vi.fn(),
+      cancelScope: vi.fn(),
     },
-    cancel: vi.fn(),
-    cancelScope: vi.fn(),
-  }),
 }));
 
 let createExecTool: typeof import("./bash-tools.exec-run.js").createExecTool;
@@ -133,6 +141,7 @@ const EGRESS_ENV = {
   SSL_CERT_FILE: "/state/secret-egress/root-ca.pem",
   CURL_CA_BUNDLE: "/state/secret-egress/root-ca.pem",
   REQUESTS_CA_BUNDLE: "/state/secret-egress/root-ca.pem",
+  GIT_SSL_CAINFO: "/state/secret-egress/root-ca.pem",
 } as const;
 
 async function withTeamStoreEntries(
@@ -264,6 +273,42 @@ describe("exec store environment", () => {
     mocks.nodeHostParams.length = 0;
     mocks.spawnInputs.length = 0;
     mocks.proxyBindings.length = 0;
+  });
+
+  it("delivers the managed Git CA bundle to a real Gateway exec child", async () => {
+    vi.stubEnv("GIT_SSL_CAINFO", "/untrusted/inherited-ca.pem");
+    await withTeamStoreEntries([], async () => {
+      const supervisor = createProcessSupervisor();
+      mocks.realSupervisor = supervisor;
+      mocks.egressActive = true;
+      try {
+        const tool = createExecTool({
+          host: "gateway",
+          security: "full",
+          ask: "off",
+          cwd: process.env.OPENCLAW_STATE_DIR,
+          operationalRunInstance: { instanceId: "instance-1", runId: "run-1" },
+          config: { secrets: { egressProxy: { enabled: true } } },
+        });
+        const result = await tool.execute("call-real-git-ca", {
+          command: [process.execPath, "-p", '"git-ca="+process.env.GIT_SSL_CAINFO']
+            .map(quoteCliArg)
+            .join(" "),
+          timeoutSeconds: 5,
+          yieldMs: 10_000,
+        });
+        expect(result.details).toMatchObject({ status: "completed", exitCode: 0 });
+        expect(result.content).toEqual([
+          expect.objectContaining({
+            type: "text",
+            text: expect.stringContaining(`git-ca=${EGRESS_ENV.GIT_SSL_CAINFO}`),
+          }),
+        ]);
+      } finally {
+        mocks.realSupervisor = undefined;
+        await supervisor.shutdown();
+      }
+    });
   });
 
   it("adds only team env-kind entries to gateway exec subprocesses", async () => {
@@ -490,6 +535,7 @@ describe("exec store environment", () => {
             expect(resolveSecretSentinel(env.SERVICE_API_KEY ?? "")).toBe("enabled-secret");
             expect(env).toMatchObject(EGRESS_ENV);
             const childEnv = mocks.spawnInputs.at(-1)?.env;
+            expect(childEnv).toMatchObject(EGRESS_ENV);
             expect(childEnv?.SERVICE_API_KEY).toBe(env.SERVICE_API_KEY);
             expect(JSON.stringify(childEnv)).not.toContain("enabled-secret");
             expect(JSON.stringify(env)).not.toContain("enabled-secret");
