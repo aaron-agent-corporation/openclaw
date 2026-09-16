@@ -93,3 +93,25 @@ while requesting the same digest from the persistent setting was accepted.
 Local helper checks: `node --test deploy/render/deploy.test.mjs`. A real image
 smoke needs Docker and a fully built image:
 `SOURCE_SHA=<sha> IMAGE_VERSION=<version> node deploy/render/smoke-image.mjs <image>`.
+
+## Persistent-disk host scripts (`host-bin/`)
+
+The Render service does not run the image's default command. Its start command
+is `node /data/bin/openclaw-prestart.cjs`, and the three scripts under
+`host-bin/` are the versioned copies of what lives in `/data/bin` on the
+service's persistent disk. The image never ships them; they survive image
+rollouts and only change when an operator copies a new version onto the disk.
+
+| File                             | Role                                                                                                                                                                                                                                                                                                                               |
+| -------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `openclaw-prestart.cjs`          | Normalizes `openclaw.json` at every boot (Codex app-server home scope, MCP sandbox origin, public origin, device-pair URL), then execs the entrypoint.                                                                                                                                                                             |
+| `openclaw-secure-entrypoint.mjs` | Runs the gateway on loopback `18789`, exposes the public `/healthz` wrapper on `$PORT`, starts `cloudflared` once the gateway answers, and shuts everything down if either child exits. Starts the Code-KG warm watcher.                                                                                                           |
+| `openclaw-codekg-warm.mjs`       | Best-effort Code-KG cache warmer. Runs the plugin's exact Stop check for the configured repository at boot, then re-runs it whenever the built Code-KG dist fingerprint changes and settles (30 s poll, 20 s settle), so the first native Stop after a boot or rebuild never trips the 7.5 s relay deadline. Never blocks startup. |
+
+Install or update by copying the file to `/data/bin` on the running service
+(same name, mode `644`, or `755` for the prestart) and comparing `sha256sum`
+against this checkout. Entrypoint and prestart changes take effect only on the
+next service restart, which needs operator approval; the warm module is loaded
+by the entrypoint at boot as well. `node --check` each file before copying.
+`node --test deploy/render/host-bin/codekg-warm.test.mjs` covers the warm
+module's pure helpers.
