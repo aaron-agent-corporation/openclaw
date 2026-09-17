@@ -25,6 +25,11 @@ export type CodexAppServerServerRequest = Required<Pick<RpcRequest, "id" | "meth
 export type CodexThreadRouteScope = {
   threadId: string;
   turnId?: string;
+  /**
+   * Set when `threadId` is a native subagent thread whose dynamic tool call was
+   * routed to the reserved route of this ancestor thread.
+   */
+  parentThreadId?: string;
 };
 type CodexThreadRequestHandler = (
   request: CodexAppServerServerRequest,
@@ -127,8 +132,16 @@ export function getCodexAppServerTurnRouter(
   return router;
 }
 
+// Native subagent threads are created by Codex, never reserved here. Their
+// parent link (from thread/started) lets their OpenClaw tool calls reach the
+// ancestor route that owns the tool bridge and hook identity.
+const CHILD_THREAD_PARENT_LIMIT = 512;
+
 class ClientTurnRouter implements CodexAppServerTurnRouter {
   private readonly routes = new Map<string, Route>();
+  // Each link is pinned to the reserved ancestor route that was live when the
+  // child was announced; a later route on the same thread never inherits it.
+  private readonly childThreadParents = new Map<string, { parentThreadId: string; route: Route }>();
   private readonly globalWarnings: CodexServerNotification[] = [];
   private readonly nativeTurnCompletionWatchers = new Map<
     string,
@@ -370,10 +383,51 @@ class ClientTurnRouter implements CodexAppServerTurnRouter {
 
   // Returns the route's serialized tail so awaiting the client's notification
   // fan-out observes queued processing, not just enqueueing.
+  private recordChildThread(notification: CodexServerNotification): void {
+    if (notification.method !== "thread/started") {
+      return;
+    }
+    const link = readSubagentThreadLink(notification.params);
+    if (!link || link.threadId === link.parentThreadId || this.routes.has(link.threadId)) {
+      return;
+    }
+    const route =
+      this.routes.get(link.parentThreadId) ?? this.resolveAncestorRoute(link.parentThreadId);
+    if (!route) {
+      // No live OpenClaw turn owns this lineage; nothing may serve it later.
+      return;
+    }
+    if (this.childThreadParents.size >= CHILD_THREAD_PARENT_LIMIT) {
+      const oldest = this.childThreadParents.keys().next().value;
+      if (oldest !== undefined) {
+        this.childThreadParents.delete(oldest);
+      }
+    }
+    this.childThreadParents.set(link.threadId, { parentThreadId: link.parentThreadId, route });
+  }
+
+  /** Resolves the pinned, still-reserved ancestor route of a native subagent thread. */
+  private resolveAncestorRoute(threadId: string): Route | undefined {
+    const link = this.childThreadParents.get(threadId);
+    if (!link || link.route.released || this.routes.get(link.route.threadId) !== link.route) {
+      return undefined;
+    }
+    return link.route;
+  }
+
+  private forgetDescendants(route: Route): void {
+    for (const [threadId, link] of this.childThreadParents) {
+      if (link.route === route) {
+        this.childThreadParents.delete(threadId);
+      }
+    }
+  }
+
   private routeNotification(notification: CodexServerNotification): Promise<void> | undefined {
     if (this.closeError) {
       return undefined;
     }
+    this.recordChildThread(notification);
     const scope = readScope(notification.params);
     if (
       !scope.threadId &&
@@ -469,7 +523,14 @@ class ClientTurnRouter implements CodexAppServerTurnRouter {
     if (!scope.threadId) {
       return undefined;
     }
-    const route = this.routes.get(scope.threadId);
+    let route = this.routes.get(scope.threadId);
+    // Only dynamic tool calls cross the child boundary: approvals, user input,
+    // and elicitations of a child thread stay with their native defaults.
+    const ancestor =
+      !route && request.method === "item/tool/call"
+        ? this.resolveAncestorRoute(scope.threadId)
+        : undefined;
+    route ??= ancestor;
     if (!route) {
       return undefined;
     }
@@ -497,7 +558,9 @@ class ClientTurnRouter implements CodexAppServerTurnRouter {
         return undefined;
       }
     }
-    if (route.gate === "bound" && scope.turnId && scope.turnId !== route.turnId) {
+    // A child turn id never matches the ancestor's bound turn; the ancestor
+    // handler decides whether its current turn may serve the child.
+    if (!ancestor && route.gate === "bound" && scope.turnId && scope.turnId !== route.turnId) {
       return undefined;
     }
     if (!(await waitForPromiseOrAbort(this.waitForNotifications(route), requestSignal))) {
@@ -512,6 +575,7 @@ class ClientTurnRouter implements CodexAppServerTurnRouter {
         {
           threadId: scope.threadId,
           ...(scope.turnId ? { turnId: scope.turnId } : {}),
+          ...(ancestor ? { parentThreadId: ancestor.threadId } : {}),
         },
         requestSignal,
       );
@@ -633,6 +697,7 @@ class ClientTurnRouter implements CodexAppServerTurnRouter {
       return;
     }
     route.released = error;
+    this.forgetDescendants(route);
     // Keep the bounded queue on physical close for an accepted turn/start response
     // whose continuation has not bound yet; only exact terminal receipts can drain it.
     if (error !== this.closeError) {
@@ -699,6 +764,28 @@ function abortReason(signal: AbortSignal): Error {
   return signal.reason instanceof Error
     ? signal.reason
     : new Error(String(signal.reason ?? "codex app-server thread route aborted"));
+}
+
+function readSubagentThreadLink(
+  value: JsonValue | undefined,
+): { threadId: string; parentThreadId: string } | undefined {
+  if (!isJsonObject(value) || !isJsonObject(value.thread)) {
+    return undefined;
+  }
+  const thread = value.thread;
+  const threadId = typeof thread.id === "string" ? thread.id.trim() : "";
+  if (!threadId) {
+    return undefined;
+  }
+  let parentThreadId = typeof thread.parentThreadId === "string" ? thread.parentThreadId : "";
+  if (!parentThreadId && isJsonObject(thread.source) && isJsonObject(thread.source.subAgent)) {
+    const spawn = thread.source.subAgent.thread_spawn;
+    if (isJsonObject(spawn) && typeof spawn.parent_thread_id === "string") {
+      parentThreadId = spawn.parent_thread_id;
+    }
+  }
+  parentThreadId = parentThreadId.trim();
+  return parentThreadId ? { threadId, parentThreadId } : undefined;
 }
 
 function readScope(value: JsonValue | undefined) {

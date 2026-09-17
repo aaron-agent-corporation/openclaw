@@ -46,3 +46,17 @@ export function registerSecretEgressProxyRun(
   }
   return proxy.registerRun(run, bindings);
 }
+
+/**
+ * Holds one registered run's proxy credentials open for a live admitted
+ * subprocess. Returns the release callback; call it when the process exits.
+ */
+export function retainSecretEgressProxyRun(
+  run: Readonly<{ instanceId: string; runId: string }>,
+): () => void {
+  const proxy = getSecretEgressProxyRegistry().activeProxy;
+  if (!proxy) {
+    throw new Error("Secret egress proxy is not active in this Gateway process");
+  }
+  return proxy.retainRun(run);
+}

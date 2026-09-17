@@ -162,6 +162,126 @@ describe("CodexAppServerTurnRouter", () => {
     expect(requestHandler).not.toHaveBeenCalled();
   });
 
+  it("routes a native subagent's dynamic tool call to its ancestor route only", async () => {
+    const harness = createHarness();
+    const router = getCodexAppServerTurnRouter(harness.client);
+    const scopes: unknown[] = [];
+    const parentRequests = vi.fn((_request: unknown, scope: unknown) => {
+      scopes.push(scope);
+      return { owner: "parent" };
+    });
+    const parent = router.reserveThread({
+      threadId: "thread-parent",
+      onNotification: vi.fn(),
+      onRequest: parentRequests,
+    });
+    parent.armTurn();
+    await parent.bindTurn("turn-parent");
+
+    harness.send({
+      method: "thread/started",
+      params: {
+        thread: {
+          id: "thread-child",
+          source: { subAgent: { thread_spawn: { parent_thread_id: "thread-parent" } } },
+        },
+      },
+    });
+    harness.send({
+      method: "thread/started",
+      params: { thread: { id: "thread-grandchild", parentThreadId: "thread-child" } },
+    });
+    await settleInput();
+
+    harness.send({
+      id: "request-child",
+      method: "item/tool/call",
+      params: { threadId: "thread-child", turnId: "turn-child", tool: "codekg_cli" },
+    });
+    harness.send({
+      id: "request-grandchild",
+      method: "item/tool/call",
+      params: { threadId: "thread-grandchild", turnId: "turn-grandchild", tool: "codekg_cli" },
+    });
+    harness.send({
+      id: "request-child-approval",
+      method: "item/commandExecution/requestApproval",
+      params: { threadId: "thread-child", turnId: "turn-child", itemId: "item-1" },
+    });
+
+    expect(await waitForResponse(harness, "request-child")).toMatchObject({
+      result: { owner: "parent" },
+    });
+    expect(await waitForResponse(harness, "request-grandchild")).toMatchObject({
+      result: { owner: "parent" },
+    });
+    // Approvals of a child thread keep their native default instead of the
+    // ancestor's approval policy.
+    expect(await waitForResponse(harness, "request-child-approval")).toMatchObject({
+      result: { decision: "decline" },
+    });
+    expect(parentRequests).toHaveBeenCalledTimes(2);
+    expect(scopes).toEqual([
+      { threadId: "thread-child", turnId: "turn-child", parentThreadId: "thread-parent" },
+      {
+        threadId: "thread-grandchild",
+        turnId: "turn-grandchild",
+        parentThreadId: "thread-parent",
+      },
+    ]);
+
+    parent.release();
+    // A later turn on the same parent thread must not inherit the old lineage:
+    // an outlived child would otherwise execute under the new run's identity.
+    const successorRequests = vi.fn(() => ({ owner: "successor" }));
+    const successor = router.reserveThread({
+      threadId: "thread-parent",
+      onNotification: vi.fn(),
+      onRequest: successorRequests,
+    });
+    successor.armTurn();
+    await successor.bindTurn("turn-parent-2");
+    harness.send({
+      id: "request-child-after-release",
+      method: "item/tool/call",
+      params: { threadId: "thread-child", turnId: "turn-child-2", tool: "codekg_cli" },
+    });
+    expect(await waitForResponse(harness, "request-child-after-release")).toMatchObject({
+      result: { success: false },
+    });
+    expect(parentRequests).toHaveBeenCalledTimes(2);
+    expect(successorRequests).not.toHaveBeenCalled();
+    successor.release();
+  });
+
+  it("ignores subagent announcements that no reserved ancestor route owns", async () => {
+    const harness = createHarness();
+    const router = getCodexAppServerTurnRouter(harness.client);
+    harness.send({
+      method: "thread/started",
+      params: { thread: { id: "thread-orphan", parentThreadId: "thread-unreserved" } },
+    });
+    await settleInput();
+    const lateRequests = vi.fn(() => ({ owner: "late" }));
+    const late = router.reserveThread({
+      threadId: "thread-unreserved",
+      onNotification: vi.fn(),
+      onRequest: lateRequests,
+    });
+    late.armTurn();
+    await late.bindTurn("turn-late");
+    harness.send({
+      id: "request-orphan",
+      method: "item/tool/call",
+      params: { threadId: "thread-orphan", turnId: "turn-orphan", tool: "codekg_cli" },
+    });
+    expect(await waitForResponse(harness, "request-orphan")).toMatchObject({
+      result: { success: false },
+    });
+    expect(lateRequests).not.toHaveBeenCalled();
+    late.release();
+  });
+
   it("routes concurrent traffic to the exact thread and turn", async () => {
     const harness = createHarness();
     const router = getCodexAppServerTurnRouter(harness.client);

@@ -146,7 +146,52 @@ export function createCodexAttemptServerRequestController(
         return undefined;
       }
       const call = readCodexDynamicToolCallParams(request.params);
-      if (!call || call.threadId !== resourceState.thread.threadId || call.turnId !== turnId) {
+      if (!call) {
+        return undefined;
+      }
+      if (scope.parentThreadId === resourceState.thread.threadId) {
+        if (call.threadId !== scope.threadId || call.threadId === resourceState.thread.threadId) {
+          return undefined;
+        }
+        // A native subagent of this thread called an OpenClaw tool. It runs on
+        // this attempt's tool bridge and hook identity, so gating and receipts
+        // land on this run. The child's own turn accounting stays native: its
+        // items never reach this route, so it must not join this turn's
+        // pending-completion ledger or ordinal/transcript projection.
+        markCurrentTurnRequestProgress();
+        const childToolMeta = inferCodexDynamicToolMeta(
+          call,
+          resolveCodexToolProgressDetailMode(params.toolProgressDetail),
+        );
+        trajectoryRecorder?.recordEvent("tool.call", {
+          threadId: call.threadId,
+          turnId: call.turnId,
+          toolCallId: call.callId,
+          name: call.tool,
+          arguments: call.arguments,
+        });
+        const response = await handleDynamicToolCallWithTimeout({
+          call,
+          toolBridge,
+          signal,
+          timeoutMs: resolveDynamicToolCallTimeoutMs({ call, config: params.config }),
+          toolMeta: childToolMeta,
+          onAgentToolResult: params.onAgentToolResult,
+          observeToolTerminal: params.observeToolTerminal,
+        });
+        const protocolResponse = toCodexDynamicToolProtocolResponse(response);
+        trajectoryRecorder?.recordEvent("tool.result", {
+          threadId: call.threadId,
+          turnId: call.turnId,
+          toolCallId: call.callId,
+          name: call.tool,
+          success: protocolResponse.success,
+          contentItems: protocolResponse.contentItems,
+        });
+        // SAFETY: toCodexDynamicToolProtocolResponse builds plain JSON (contentItems, success).
+        return protocolResponse as JsonValue;
+      }
+      if (call.threadId !== resourceState.thread.threadId || call.turnId !== turnId) {
         return undefined;
       }
       const replayedExecution = openClawDynamicToolExecutions.get(call);

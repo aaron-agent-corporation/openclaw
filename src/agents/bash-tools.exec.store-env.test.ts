@@ -25,6 +25,8 @@ const mocks = vi.hoisted(() => ({
   }>,
   spawnInputs: [] as Array<{ env?: Record<string, string> }>,
   proxyBindings: [] as Array<unknown>,
+  proxyHolds: 0,
+  proxyHoldsPeak: 0,
 }));
 
 vi.mock("../plugins/hook-runner-global.js", () => ({
@@ -34,6 +36,13 @@ vi.mock("../plugins/hook-runner-global.js", () => ({
 
 vi.mock("../secrets/egress-proxy/registry.js", () => ({
   isSecretEgressProxyActive: () => mocks.egressActive,
+  retainSecretEgressProxyRun: () => {
+    mocks.proxyHolds += 1;
+    mocks.proxyHoldsPeak = Math.max(mocks.proxyHoldsPeak, mocks.proxyHolds);
+    return () => {
+      mocks.proxyHolds -= 1;
+    };
+  },
   registerSecretEgressProxyRun: (_run: unknown, bindings: unknown) => {
     mocks.proxyBindings.push(bindings);
     return {
@@ -273,6 +282,41 @@ describe("exec store environment", () => {
     mocks.nodeHostParams.length = 0;
     mocks.spawnInputs.length = 0;
     mocks.proxyBindings.length = 0;
+    mocks.proxyHolds = 0;
+    mocks.proxyHoldsPeak = 0;
+  });
+
+  it("holds the run's proxy credentials until a backgrounded Gateway child exits", async () => {
+    await withTeamStoreEntries([], async () => {
+      const supervisor = createProcessSupervisor();
+      mocks.realSupervisor = supervisor;
+      mocks.egressActive = true;
+      try {
+        const tool = createExecTool({
+          host: "gateway",
+          security: "full",
+          ask: "off",
+          cwd: process.env.OPENCLAW_STATE_DIR,
+          operationalRunInstance: { instanceId: "instance-1", runId: "run-1" },
+          config: { secrets: { egressProxy: { enabled: true } } },
+        });
+        const result = await tool.execute("call-background-hold", {
+          command: [process.execPath, "-e", "setTimeout(() => {}, 700)"].map(quoteCliArg).join(" "),
+          timeoutSeconds: 5,
+          yieldMs: 10,
+        });
+        // The exec call returned while the child is alive: the run's token must
+        // stay valid for the child even though the agent turn may now end.
+        expect(result.details).toMatchObject({ status: "running" });
+        expect(mocks.proxyHolds).toBe(1);
+        await vi.waitFor(() => expect(mocks.proxyHolds).toBe(0), { timeout: 5_000 });
+        expect(mocks.proxyHoldsPeak).toBe(1);
+      } finally {
+        mocks.egressActive = false;
+        mocks.realSupervisor = undefined;
+        await supervisor.shutdown();
+      }
+    });
   });
 
   it("delivers the managed Git CA bundle to a real Gateway exec child", async () => {

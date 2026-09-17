@@ -589,6 +589,38 @@ describe("secret egress proxy", () => {
     ]);
   });
 
+  it("defers revocation while an admitted subprocess still holds the run", async () => {
+    const auth = basicProxyAuth(registeredPassword(proxyEnv));
+    const releaseFirst = proxy.retainRun(run);
+    const releaseSecond = proxy.retainRun(run);
+
+    // The agent run ends while its backgrounded process is alive.
+    proxy.revokeRun(run);
+    await expect(forwardedRequest(auth)).resolves.toBe(200);
+    releaseFirst();
+    releaseFirst();
+    await expect(forwardedRequest(auth)).resolves.toBe(200);
+
+    releaseSecond();
+    const refused = await rawConnect({ auth });
+    expect(refused.response).toContain("407 Proxy Authentication Required");
+    refused.socket.destroy();
+    expect(auditEvents).toContainEqual(
+      expect.objectContaining({ kind: "refused", reason: "invalid-proxy-auth" }),
+    );
+  });
+
+  it("releases a held run immediately when no revocation is pending", async () => {
+    const auth = basicProxyAuth(registeredPassword(proxyEnv));
+    proxy.retainRun(run)();
+    await expect(forwardedRequest(auth)).resolves.toBe(200);
+    proxy.revokeRun(run);
+    const refused = await rawConnect({ auth });
+    expect(refused.response).toContain("407 Proxy Authentication Required");
+    refused.socket.destroy();
+    expect(() => proxy.retainRun(run)).toThrow("Secret egress proxy run is not registered");
+  });
+
   it("revokes Basic authorization with the exact owning run and keeps audits payload-free", async () => {
     const secret = "audit-secret-value";
     const sentinel = mintSecretSentinel(secret, { label: "egress-audit" });

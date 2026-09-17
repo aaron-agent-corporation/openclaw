@@ -25,6 +25,7 @@ import { parseAgentSessionKey, resolveAgentIdFromSessionKey } from "../routing/s
 import {
   isSecretEgressProxyActive,
   registerSecretEgressProxyRun,
+  retainSecretEgressProxyRun,
 } from "../secrets/egress-proxy/registry.js";
 import type { SecretStoreExecEnvironment } from "../secrets/store/secret-store.js";
 import { createDeferredCore } from "../shared/deferred.js";
@@ -408,6 +409,10 @@ export function createExecTool(
       let run: ExecProcessHandle;
       const settlement = createExecProcessSettlement();
       let effectiveTimeout: number;
+      // The proxy token is minted per agent run, but a backgrounded process
+      // legitimately outlives that run. The process, not the turn, owns the
+      // hold: it is released only once the child has exited.
+      let releaseSecretEgressHold: (() => void) | undefined;
       try {
         if (elevatedRequested) {
           logInfo(`exec: elevated command ${truncateMiddle(params.command, 120)}`);
@@ -432,6 +437,7 @@ export function createExecTool(
             defaults.operationalRunInstance,
             storeEnv.secretEgressBindings ?? [],
           );
+          releaseSecretEgressHold = retainSecretEgressProxyRun(defaults.operationalRunInstance);
         }
         const { env, requestedEnv } = resolvePreparedExecEnvironment({
           execParams: params,
@@ -551,6 +557,8 @@ export function createExecTool(
           });
           const immediateResult = gatewayResult.pendingResult ?? gatewayResult.deniedResult;
           if (immediateResult) {
+            // Nothing was spawned; the run's own closure governs the token.
+            releaseSecretEgressHold?.();
             return attachExecApprovalReview(immediateResult, approvalReview);
           }
           signal?.throwIfAborted();
@@ -607,7 +615,12 @@ export function createExecTool(
           onSettledBeforeNotify: settlement.settle,
         });
         discardPreparedSandboxWorkdir = null;
+        if (releaseSecretEgressHold) {
+          const release = releaseSecretEgressHold;
+          void run.promise.then(release, release);
+        }
       } catch (error) {
+        releaseSecretEgressHold?.();
         discardPreparedSandboxWorkdir?.();
         return attachExecApprovalReview(ExecProcessPreflightError.unwrap(error), approvalReview);
       }

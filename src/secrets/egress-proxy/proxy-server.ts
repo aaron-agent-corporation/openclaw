@@ -61,6 +61,12 @@ export type SecretEgressProxyHandle = {
     bindings?: readonly SecretEgressSentinelBinding[],
   ) => Record<string, string>;
   revokeRun: (run: Readonly<{ instanceId: string; runId: string }>) => void;
+  /**
+   * Keeps a registered run's credentials valid while an admitted subprocess
+   * that already carries them is alive. Revocation requested while holds
+   * remain is applied when the last hold is released.
+   */
+  retainRun: (run: Readonly<{ instanceId: string; runId: string }>) => () => void;
   stop: () => Promise<void>;
 };
 
@@ -72,6 +78,9 @@ type RegisteredRun = {
   isActive: () => boolean;
   resources: Set<Readable | Writable>;
   tlsServers: Map<string, SecretEgressTlsContext>;
+  /** Live subprocess holders; the run's closure defers revocation until they exit. */
+  holds: number;
+  revokeRequested: boolean;
 };
 
 function parseConnectTarget(rawTarget: string | undefined): ConnectTarget {
@@ -667,6 +676,8 @@ export async function startSecretEgressProxyServer(params: {
           isActive: () => !stopped && registrations.get(key) === registered,
           resources: new Set(),
           tlsServers: new Map(),
+          holds: 0,
+          revokeRequested: false,
         };
         registrations.set(key, registered);
       }
@@ -698,9 +709,38 @@ export async function startSecretEgressProxyServer(params: {
     },
     revokeRun: (run) => {
       const registered = registrations.get(runKey(run));
-      if (registered) {
-        revokeRegistration(registered);
+      if (!registered) {
+        return;
       }
+      if (registered.holds > 0) {
+        // An admitted subprocess still carries this token (for example a
+        // backgrounded exec that outlives its agent turn). Revoke when it exits.
+        registered.revokeRequested = true;
+        return;
+      }
+      revokeRegistration(registered);
+    },
+    retainRun: (run) => {
+      const registered = registrations.get(runKey(run));
+      if (!registered) {
+        throw new Error("Secret egress proxy run is not registered");
+      }
+      registered.holds += 1;
+      let released = false;
+      return () => {
+        if (released) {
+          return;
+        }
+        released = true;
+        registered.holds -= 1;
+        if (
+          registered.holds === 0 &&
+          registered.revokeRequested &&
+          registrations.get(registered.key) === registered
+        ) {
+          revokeRegistration(registered);
+        }
+      };
     },
     stop: () => {
       if (stopPromise) {

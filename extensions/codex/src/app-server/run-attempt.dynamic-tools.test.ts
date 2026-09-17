@@ -324,6 +324,63 @@ describe("runCodexAppServerAttempt dynamic tools", () => {
     },
   );
 
+  it("serves a native subagent's dynamic tool call on the parent attempt's bridge", async () => {
+    const harness = createStartedThreadHarness();
+    const onExecutionPhase = vi.fn();
+    const params = createParams(
+      path.join(tempDir, "session.jsonl"),
+      path.join(tempDir, "workspace"),
+    );
+    params.onExecutionPhase = onExecutionPhase;
+
+    const run = runCodexAppServerAttempt(params);
+    await harness.waitForMethod("thread/start");
+    await vi.waitFor(() =>
+      expect(onExecutionPhase).toHaveBeenCalledWith(
+        expect.objectContaining({ phase: "turn_accepted" }),
+      ),
+    );
+    // Codex announces the spawned child before the child calls any tool.
+    await harness.notify({
+      method: "thread/started",
+      params: {
+        thread: {
+          id: "thread-child",
+          source: { subAgent: { thread_spawn: { parent_thread_id: "thread-1" } } },
+        },
+      },
+    });
+
+    const childCall = (tool: string, threadId: string) => ({
+      id: `request-${threadId}`,
+      method: "item/tool/call",
+      params: {
+        threadId,
+        turnId: `turn-${threadId}`,
+        callId: `call-${threadId}`,
+        namespace: null,
+        tool,
+        arguments: {},
+      },
+    });
+    // Reaching the parent bridge is the proof: the bridge, not the client
+    // default, answers for tools it does not know.
+    expect(await harness.handleServerRequest(childCall("lookup", "thread-child"))).toMatchObject({
+      success: false,
+      contentItems: [{ type: "inputText", text: "Unknown OpenClaw tool: lookup" }],
+    });
+    expect(await harness.handleServerRequest(childCall("lookup", "thread-stranger"))).toBe(
+      undefined,
+    );
+
+    await harness.completeTurn({ threadId: "thread-1", turnId: "turn-1" });
+    await run;
+    // The child's call is not this turn's tool activity.
+    expect(onExecutionPhase).not.toHaveBeenCalledWith(
+      expect.objectContaining({ phase: "tool_execution_started" }),
+    );
+  });
+
   it("emits normalized tool progress around app-server dynamic tool requests", async () => {
     const harness = createStartedThreadHarness();
     const onRunAgentEvent = vi.fn();

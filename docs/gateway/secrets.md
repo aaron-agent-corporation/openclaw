@@ -412,7 +412,7 @@ Current limits:
 - Allowed-host policy is exact-hostname authorization only. It does not validate the resolved IP or prevent an allowed origin from reflecting credentials.
 - Plain HTTP is refused; it is not upgraded or substituted.
 - Secret egress applies only to Gateway-hosted exec. Sandbox and remote `node` exec receive neither proxy variables nor sentinels, so shared-store `secret` entries are unavailable there. Provider-native harness subprocesses also do not use this proxy.
-- Background subprocesses lose proxy authorization when their owning agent run ends, even if the process itself is still alive.
+- A Gateway-hosted exec process keeps its proxy authorization until it exits, including a backgrounded process that outlives the agent run that started it. The run's other credentials are revoked when the run ends; revocation of the proxy token waits for the last live process from that run. Killing the process (`process kill`, timeout, or Gateway shutdown) ends the authorization immediately.
 
 ## File-backed API keys
 

@@ -55,10 +55,14 @@ export async function deployRender({
         `${method} request failed. ${method === "GET" ? "Inspect the run and Render status." : "Write outcome is unknown; inspect Render before retrying."}`,
       );
     }
-    if (!response.ok)
+    if (!response.ok) {
+      // Render explains rejections in the body (for example an image digest the
+      // registry cannot serve yet). Surface it, bounded, so a failed run is diagnosable.
+      const detail = (await response.text().catch(() => "")).replace(/\s+/g, " ").slice(0, 300);
       throw new Error(
-        `${method} request returned HTTP ${response.status}; inspect Render before retrying. No rollback was attempted.`,
+        `${method} request returned HTTP ${response.status}${detail ? ` (${detail})` : ""}; inspect Render before retrying. No rollback was attempted.`,
       );
+    }
     return response.json();
   }
   const serviceUrl = `https://api.render.com/v1/services/${serviceId}`;
