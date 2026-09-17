@@ -138,6 +138,7 @@ class ClientTurnRouter implements CodexAppServerTurnRouter {
   // Native subagent threads are created by Codex, never reserved here; their
   // tool calls reach the reserved ancestor route that owns the tool bridge.
   private readonly lineage = new SubagentLineage<Route>();
+  private readonly unroutedToolCallThreads = new Set<string>();
   private readonly globalWarnings: CodexServerNotification[] = [];
   private readonly nativeTurnCompletionWatchers = new Map<
     string,
@@ -379,6 +380,24 @@ class ClientTurnRouter implements CodexAppServerTurnRouter {
 
   // Returns the route's serialized tail so awaiting the client's notification
   // fan-out observes queued processing, not just enqueueing.
+  // The client's default reply hides why a tool call found no owner; name the
+  // thread once so an unannounced or outlived subagent is diagnosable.
+  private warnUnroutedToolCall(threadId: string, params: JsonValue | undefined): void {
+    if (this.unroutedToolCallThreads.has(threadId)) {
+      return;
+    }
+    if (this.unroutedToolCallThreads.size >= DEFAULT_GLOBAL_WARNING_LIMIT) {
+      this.unroutedToolCallThreads.clear();
+    }
+    this.unroutedToolCallThreads.add(threadId);
+    const tool = isJsonObject(params) && typeof params.tool === "string" ? params.tool : undefined;
+    embeddedAgentLog.warn("codex app-server dynamic tool call from a thread with no route", {
+      threadId,
+      tool,
+      knownSubagent: this.lineage.has(threadId),
+    });
+  }
+
   private liveRoute(threadId: string): Route | undefined {
     const route = this.routes.get(threadId);
     return route && !route.released ? route : undefined;
@@ -493,6 +512,9 @@ class ClientTurnRouter implements CodexAppServerTurnRouter {
         : undefined;
     route ??= ancestor;
     if (!route) {
+      if (request.method === "item/tool/call") {
+        this.warnUnroutedToolCall(scope.threadId, request.params);
+      }
       return undefined;
     }
     // A retired route owns its in-flight tools and approvals; upstream can

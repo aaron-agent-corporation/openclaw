@@ -17,25 +17,30 @@ export class SubagentLineage<Route extends { threadId: string; released?: unknow
     notification: CodexServerNotification,
     liveRoute: (threadId: string) => Route | undefined,
   ): void {
-    if (notification.method !== "thread/started") {
-      return;
-    }
-    const link = readSubagentThreadLink(notification.params);
-    if (!link || link.threadId === link.parentThreadId || liveRoute(link.threadId)) {
-      return;
-    }
-    const route = liveRoute(link.parentThreadId) ?? this.resolve(link.parentThreadId);
-    if (!route) {
-      // No live OpenClaw turn owns this lineage; nothing may serve it later.
-      return;
-    }
-    if (this.links.size >= CHILD_THREAD_PARENT_LIMIT) {
-      const oldest = this.links.keys().next().value;
-      if (oldest !== undefined) {
-        this.links.delete(oldest);
+    // Codex announces a child two ways: the child's own thread/started (with
+    // its spawn source) and the parent's collabAgentToolCall items, which name
+    // the receiver threads. Either may arrive first; both are accepted.
+    for (const link of readSubagentThreadLinks(notification)) {
+      if (link.threadId === link.parentThreadId || liveRoute(link.threadId)) {
+        continue;
       }
+      const route = liveRoute(link.parentThreadId) ?? this.resolve(link.parentThreadId);
+      if (!route) {
+        // No live OpenClaw turn owns this lineage; nothing may serve it later.
+        continue;
+      }
+      if (this.links.size >= CHILD_THREAD_PARENT_LIMIT) {
+        const oldest = this.links.keys().next().value;
+        if (oldest !== undefined) {
+          this.links.delete(oldest);
+        }
+      }
+      this.links.set(link.threadId, { parentThreadId: link.parentThreadId, route });
     }
-    this.links.set(link.threadId, { parentThreadId: link.parentThreadId, route });
+  }
+
+  has(threadId: string): boolean {
+    return this.links.has(threadId);
   }
 
   /** The pinned ancestor route of a subagent thread while that route is unreleased. */
@@ -53,9 +58,48 @@ export class SubagentLineage<Route extends { threadId: string; released?: unknow
   }
 }
 
-function readSubagentThreadLink(
-  value: JsonValue | undefined,
-): { threadId: string; parentThreadId: string } | undefined {
+type SubagentThreadLink = { threadId: string; parentThreadId: string };
+
+function readSubagentThreadLinks(notification: CodexServerNotification): SubagentThreadLink[] {
+  if (notification.method === "thread/started") {
+    const link = readSubagentThreadLink(notification.params);
+    return link ? [link] : [];
+  }
+  if (notification.method !== "item/started" && notification.method !== "item/completed") {
+    return [];
+  }
+  const params = notification.params;
+  if (!isJsonObject(params) || !isJsonObject(params.item)) {
+    return [];
+  }
+  const item = params.item;
+  if (item.type !== "collabAgentToolCall") {
+    return [];
+  }
+  const sender = typeof item.senderThreadId === "string" ? item.senderThreadId : params.threadId;
+  const parentThreadId = typeof sender === "string" ? sender.trim() : "";
+  if (!parentThreadId) {
+    return [];
+  }
+  const children = new Set<string>();
+  if (Array.isArray(item.receiverThreadIds)) {
+    for (const id of item.receiverThreadIds) {
+      if (typeof id === "string" && id.trim()) {
+        children.add(id.trim());
+      }
+    }
+  }
+  if (isJsonObject(item.agentsStates)) {
+    for (const id of Object.keys(item.agentsStates)) {
+      if (id.trim()) {
+        children.add(id.trim());
+      }
+    }
+  }
+  return [...children].map((threadId) => ({ threadId, parentThreadId }));
+}
+
+function readSubagentThreadLink(value: JsonValue | undefined): SubagentThreadLink | undefined {
   if (!isJsonObject(value) || !isJsonObject(value.thread)) {
     return undefined;
   }

@@ -254,6 +254,68 @@ describe("CodexAppServerTurnRouter", () => {
     successor.release();
   });
 
+  it("learns a subagent from the parent's collab spawn item when thread/started is absent", async () => {
+    const harness = createHarness();
+    const router = getCodexAppServerTurnRouter(harness.client);
+    const warn = vi.spyOn(embeddedAgentLog, "warn").mockImplementation(() => undefined);
+    const parentRequests = vi.fn(() => ({ owner: "parent" }));
+    const parent = router.reserveThread({
+      threadId: "thread-parent",
+      onNotification: vi.fn(),
+      onRequest: parentRequests,
+    });
+    parent.armTurn();
+    await parent.bindTurn("turn-parent");
+
+    harness.send({
+      id: "request-unknown",
+      method: "item/tool/call",
+      params: { threadId: "thread-child", turnId: "turn-child", tool: "codekg_cli" },
+    });
+    expect(await waitForResponse(harness, "request-unknown")).toMatchObject({
+      result: { success: false },
+    });
+    expect(warn).toHaveBeenCalledWith(
+      "codex app-server dynamic tool call from a thread with no route",
+      { threadId: "thread-child", tool: "codekg_cli", knownSubagent: false },
+    );
+
+    harness.send({
+      method: "item/started",
+      params: {
+        threadId: "thread-parent",
+        turnId: "turn-parent",
+        item: {
+          type: "collabAgentToolCall",
+          tool: "spawnAgent",
+          status: "inProgress",
+          senderThreadId: "thread-parent",
+          receiverThreadIds: ["thread-child"],
+          agentsStates: { "thread-child-2": { status: "pendingInit" } },
+        },
+      },
+    });
+    await settleInput();
+    harness.send({
+      id: "request-child",
+      method: "item/tool/call",
+      params: { threadId: "thread-child", turnId: "turn-child", tool: "codekg_cli" },
+    });
+    harness.send({
+      id: "request-child-2",
+      method: "item/tool/call",
+      params: { threadId: "thread-child-2", turnId: "turn-child-2", tool: "codekg_cli" },
+    });
+    expect(await waitForResponse(harness, "request-child")).toMatchObject({
+      result: { owner: "parent" },
+    });
+    expect(await waitForResponse(harness, "request-child-2")).toMatchObject({
+      result: { owner: "parent" },
+    });
+    expect(parentRequests).toHaveBeenCalledTimes(2);
+    parent.release();
+  });
+
   it("ignores subagent announcements that no reserved ancestor route owns", async () => {
     const harness = createHarness();
     const router = getCodexAppServerTurnRouter(harness.client);
