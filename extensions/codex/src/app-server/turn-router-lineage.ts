@@ -17,9 +17,10 @@ export class SubagentLineage<Route extends { threadId: string; released?: unknow
     notification: CodexServerNotification,
     liveRoute: (threadId: string) => Route | undefined,
   ): void {
-    // Codex announces a child two ways: the child's own thread/started (with
-    // its spawn source) and the parent's collabAgentToolCall items, which name
-    // the receiver threads. Either may arrive first; both are accepted.
+    // Codex announces a child three ways: the child's own thread/started (with
+    // its spawn source), the parent's subAgentActivity items (multi-agent v2
+    // spawns), and the parent's collabAgentToolCall items, which name the
+    // receiver threads. Any may arrive first; all are accepted.
     for (const link of readSubagentThreadLinks(notification)) {
       if (link.threadId === link.parentThreadId || liveRoute(link.threadId)) {
         continue;
@@ -73,6 +74,14 @@ function readSubagentThreadLinks(notification: CodexServerNotification): Subagen
     return [];
   }
   const item = params.item;
+  if (item.type === "subAgentActivity") {
+    // codex's multi-agent v2 spawn path (core multi_agents_v2/spawn.rs) announces
+    // a child only through this item on the parent's thread; no thread/started
+    // or collabAgentToolCall item follows.
+    const parentThreadId = typeof params.threadId === "string" ? params.threadId.trim() : "";
+    const threadId = typeof item.agentThreadId === "string" ? item.agentThreadId.trim() : "";
+    return parentThreadId && threadId ? [{ threadId, parentThreadId }] : [];
+  }
   if (item.type !== "collabAgentToolCall") {
     return [];
   }

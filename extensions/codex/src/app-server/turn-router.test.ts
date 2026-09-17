@@ -316,6 +316,46 @@ describe("CodexAppServerTurnRouter", () => {
     parent.release();
   });
 
+  it("learns a subagent from the parent's subAgentActivity item (multi-agent v2 spawn)", async () => {
+    const harness = createHarness();
+    const router = getCodexAppServerTurnRouter(harness.client);
+    const parentRequests = vi.fn(() => ({ owner: "parent" }));
+    const parent = router.reserveThread({
+      threadId: "thread-parent",
+      onNotification: vi.fn(),
+      onRequest: parentRequests,
+    });
+    parent.armTurn();
+    await parent.bindTurn("turn-parent");
+
+    harness.send({
+      method: "item/completed",
+      params: {
+        threadId: "thread-parent",
+        turnId: "turn-parent",
+        item: {
+          type: "subAgentActivity",
+          id: "call_spawn",
+          kind: "started",
+          agentThreadId: "thread-child",
+          agentPath: "/root/worker",
+        },
+        completedAtMs: 1,
+      },
+    });
+    await settleInput();
+    harness.send({
+      id: "request-child",
+      method: "item/tool/call",
+      params: { threadId: "thread-child", turnId: "turn-child", tool: "codekg_cli" },
+    });
+    expect(await waitForResponse(harness, "request-child")).toMatchObject({
+      result: { owner: "parent" },
+    });
+    expect(parentRequests).toHaveBeenCalledTimes(1);
+    parent.release();
+  });
+
   it("ignores subagent announcements that no reserved ancestor route owns", async () => {
     const harness = createHarness();
     const router = getCodexAppServerTurnRouter(harness.client);
